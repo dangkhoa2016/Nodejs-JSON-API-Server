@@ -13,7 +13,8 @@ A JSONPlaceholder-compatible REST API built with **Node.js built-ins only** — 
 git clone <repo-url>
 cd json-api-server
 
-npm start
+npm run db:setup   # create tables + seed data (required before first start)
+npm start          # start server
 # or with file watching for development:
 npm run dev
 ```
@@ -162,7 +163,10 @@ json-api-server/
 │   ├── config.js                # Centralized config — auto-loads dotenv via load-env.js, exports camelCase
 │   ├── load-env.js              # Shared dotenv loader (auto-run on require, skips in production)
 │   ├── server.js                # HTTP server, routing, middleware, handlers
-│   ├── database.js              # SQLite layer (node:sqlite) — migration, seed, CRUD (reads config.js)
+│   ├── database.js              # SQLite layer (node:sqlite) — CRUD operations (reads config.js)
+│   ├── db/
+│   │   ├── migrate.js           # Table creation (standalone via npm run db:migrate)
+│   │   └── seed.js              # Hardcoded seed data (standalone via npm run db:seed)
 │   ├── rate-limiter.js          # Rate limiter (Redis or in-memory fallback)
 │   └── redis.js                 # Pure-Node Redis client via RESP protocol over TCP
 ├── tests/
@@ -172,8 +176,8 @@ json-api-server/
 │   └── inspect-queries.sql      # SQL queries for database inspection
 ├── storage/                     # SQLite database files (auto-created)
 ├── temp/                        # Temporary files (gitignored)
-├── .env                         # Base configuration (loaded last — lowest priority)
-├── .env.dev                     # Development overrides
+├── .env                         # Base configuration (tried first in development — highest priority)
+├── .env.dev                     # Development fallback (tried if .env not found)
 ├── .env.test                    # Test configuration (port 3001, separate DB, no rate limit)
 ├── .env.prod.example            # Production template (copy to .env.prod)
 ├── .env.example                 # Reference for all available variables
@@ -189,9 +193,11 @@ json-api-server/
 bin/start.js → src/load-env.js (loads .env per NODE_ENV, skipped in production)
   → src/server.js
       ├── src/config.js     (centralized config, auto-loads dotenv)
-      ├── src/database.js   (SQLite schema + seed)
+      ├── src/database.js   (SQLite CRUD)
       ├── src/redis.js      (pure RESP + AUTH + URL)
       └── src/rate-limiter.js (Redis || in-memory)
+
+# Standalone scripts: npm run db:migrate / npm run db:seed / npm run db:setup
 ```
 
 ### Request Flow
@@ -207,7 +213,7 @@ HTTP Request → CORS headers → Rate limiter → Route parser → Handler → 
 - **6 tables:** `users`, `posts`, `comments`, `albums`, `photos`, `todos`
 - **WAL mode** for better concurrent read performance
 - **Foreign keys** enforced via `PRAGMA foreign_keys=ON`
-- **Seed data** auto-generated on first run:
+- **Seed data** initialized via `npm run db:seed` (hardcoded on first run):
   - 5 users (with `address` and `company` stored as JSON, parsed on read)
   - 50 posts (10 per user)
   - 250 comments (5 per post)
@@ -222,6 +228,14 @@ sqlite3 storage/data.db < manual/inspect-queries.sql
 ```
 
 This runs comprehensive queries to inspect row counts, column metadata, relationships, integrity checks, and statistics.
+
+### Database Scripts
+
+| Script       | Command                  | Description                                           |
+|--------------|--------------------------|-------------------------------------------------------|
+| `db:migrate` | `npm run db:migrate`     | Creates the 6 tables (idempotent — uses IF NOT EXISTS) |
+| `db:seed`    | `npm run db:seed`        | Inserts hardcoded seed data (skips if already seeded)  |
+| `db:setup`   | `npm run db:setup`       | Runs migrate then seed (convenience for first setup)   |
 
 ---
 

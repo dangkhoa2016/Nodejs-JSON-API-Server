@@ -8,9 +8,6 @@ const RedisClient = require('./redis');
 const { createRateLimiter } = require('./rate-limiter');
 const db = require('./database');
 
-db.migrate();
-db.seed();
-
 const redis = new RedisClient(redisOpts);
 
 const rateLimiter = createRateLimiter(redis);
