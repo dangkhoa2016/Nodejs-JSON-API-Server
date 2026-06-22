@@ -1,0 +1,10 @@
+temp
+.env
+.env.prod
+.env.production
+node_modules
+coverage
+storage/*
+!storage/.gitkeep
+
+.env.dev

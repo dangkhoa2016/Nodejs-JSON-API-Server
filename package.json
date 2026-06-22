@@ -1,0 +1,31 @@
+{
+  "name": "json-api-server",
+  "version": "1.0.0",
+  "description": "JSONPlaceholder-compatible REST API — Node.js built-ins only, SQLite + Redis",
+  "main": "bin/start.js",
+  "author": {
+    "email": "i.am@dangkhoa.dev",
+    "name": "Dang Khoa",
+    "url": "https://dangkhoa.dev"
+  },
+  "scripts": {
+    "start": "node bin/start.js",
+    "prod": "NODE_ENV=production-local node bin/start.js",
+    "dev": "node --watch bin/start.js",
+    "test": "node tests/test.js"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "keywords": [
+    "rest",
+    "api",
+    "sqlite",
+    "redis",
+    "jsonplaceholder"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "dotenv": "^17.4.2"
+  }
+}
