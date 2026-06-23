@@ -3,7 +3,7 @@
 const http = require('http');
 
 const { port, redisOpts, rateLimitMax, rateLimitEnabled,
-  rateLimitWindowMs, rateLimitWindowSec } = require('./config');
+  rateLimitWindowMs, rateLimitWindowSec, maxBodySize } = require('./config');
 const RedisClient = require('./redis');
 const { createRateLimiter } = require('./rate-limiter');
 const db = require('./database');
@@ -43,7 +43,6 @@ function badRequest(res, msg = 'Bad Request') {
   json(res, 400, { error: msg });
 }
 
-const MAX_BODY_SIZE = 1_048_576;
 const BODY_TOO_LARGE = Symbol('BODY_TOO_LARGE');
 
 function readBody(req, res) {
@@ -51,8 +50,8 @@ function readBody(req, res) {
     let body = '';
     req.on('data', (chunk) => {
       body += chunk;
-      if (body.length > MAX_BODY_SIZE) {
-        json(res, 413, { error: 'Request body too large', message: `Body exceeds ${MAX_BODY_SIZE} byte limit` });
+      if (body.length > maxBodySize) {
+        json(res, 413, { error: 'Request body too large', message: `Body exceeds ${maxBodySize} bytes limit` });
         req.destroy();
         reject(BODY_TOO_LARGE);
       }
@@ -174,7 +173,7 @@ function handleHealth(res) {
 async function requestHandler(req, res) {
   const parsed = new URL(req.url, 'http://localhost');
   const pathname = parsed.pathname;
-  const query = parsed.searchParams;
+  const query = Object.fromEntries(parsed.searchParams);
   const method = req.method.toUpperCase();
 
   if (method === 'OPTIONS') {
@@ -254,8 +253,12 @@ function printLog() {
 }
 
 function startServer() {
-  server.listen(port, printLog);
+  if (process.env.START_SERVER !== 'false') { // for testing
+    server.listen(port, printLog);
+  }
 }
 
 process.on('SIGINT', () => { server.close(); redis.quit().catch(() => { }); process.exit(0); });
 process.on('SIGTERM', () => { server.close(); redis.quit().catch(() => { }); process.exit(0); });
+
+module.exports = { server, requestHandler };

@@ -52,6 +52,7 @@ Environment files are loaded by `src/load-env.js` (auto-run via `src/config.js`)
 | `DEBUG_SQL`            | `false`     | Log all SQL queries to stderr (`true`/`false`) |
 | `RATE_LIMIT_WINDOW_MS` | `60000`     | Time window in milliseconds (default 1 min) |
 | `SEED_API_BASE_URL`    | `https://jsonplaceholder.typicode.com` | Base URL for seed data API |
+| `MAX_BODY_SIZE`        | `1048576`   | Max request body size in bytes (minimum 1) |
 
 ---
 
