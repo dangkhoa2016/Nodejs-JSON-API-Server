@@ -50,6 +50,7 @@ Environment files are loaded by `src/load-env.js` (auto-run via `src/config.js`)
 | `RATE_LIMIT_ENABLED`   | `true`      | Enable/disable rate limiting           |
 | `RATE_LIMIT_MAX`       | `100`       | Max requests per time window           |
 | `RATE_LIMIT_WINDOW_MS` | `60000`     | Time window in milliseconds (default 1 min) |
+| `SEED_API_BASE_URL`    | `https://jsonplaceholder.typicode.com` | Base URL for seed data API |
 
 ---
 
@@ -166,7 +167,7 @@ json-api-server/
 │   ├── database.js              # SQLite layer (node:sqlite) — CRUD operations (reads config.js)
 │   ├── db/
 │   │   ├── migrate.js           # Table creation (standalone via npm run db:migrate)
-│   │   └── seed.js              # Hardcoded seed data (standalone via npm run db:seed)
+│   │   └── seed.js              # Fetches seed data from [JSONPlaceholder](https://jsonplaceholder.typicode.com) API, auto-runs migrate
 │   ├── rate-limiter.js          # Rate limiter (Redis or in-memory fallback)
 │   └── redis.js                 # Pure-Node Redis client via RESP protocol over TCP
 ├── tests/
@@ -213,13 +214,13 @@ HTTP Request → CORS headers → Rate limiter → Route parser → Handler → 
 - **6 tables:** `users`, `posts`, `comments`, `albums`, `photos`, `todos`
 - **WAL mode** for better concurrent read performance
 - **Foreign keys** enforced via `PRAGMA foreign_keys=ON`
-- **Seed data** initialized via `npm run db:seed` (hardcoded on first run):
-  - 5 users (with `address` and `company` stored as JSON, parsed on read)
-  - 50 posts (10 per user)
-  - 250 comments (5 per post)
-  - 10 albums (2 per user)
-  - 50 photos (5 per album)
-  - 20 todos (4 per user, `completed` stored as 0/1 integer, returned as boolean)
+- **Seed data** fetched from [JSONPlaceholder](https://jsonplaceholder.typicode.com) on first run:
+  - 10 users (with `address` and `company` stored as JSON, parsed on read)
+  - 100 posts
+  - 500 comments
+  - 100 albums
+  - 5000 photos
+  - 200 todos
 
 ### Helper Script
 
@@ -233,9 +234,9 @@ This runs comprehensive queries to inspect row counts, column metadata, relation
 
 | Script       | Command                  | Description                                           |
 |--------------|--------------------------|-------------------------------------------------------|
-| `db:migrate` | `npm run db:migrate`     | Creates the 6 tables (idempotent — uses IF NOT EXISTS) |
-| `db:seed`    | `npm run db:seed`        | Inserts hardcoded seed data (skips if already seeded)  |
-| `db:setup`   | `npm run db:setup`       | Runs migrate then seed (convenience for first setup)   |
+| `db:migrate` | `npm run db:migrate`     | Creates the 6 tables (loads dotenv when run standalone)  |
+| `db:seed`    | `npm run db:seed`        | Fetches seed data from [JSONPlaceholder](https://jsonplaceholder.typicode.com), auto-runs migrate |
+| `db:setup`   | `npm run db:setup`       | Runs `db:seed` (which internally calls migrate)       |
 
 ---
 
@@ -261,6 +262,7 @@ The integration test automatically verifies all endpoints, including CRUD operat
 - **Pure RESP protocol** — the Redis client in `src/redis.js` implements the Redis serialization protocol over raw TCP sockets without any third-party library. Supports `AUTH` password authentication and `REDIS_URL` connection strings.
 - **Centralized config** — all environment variables are read in `src/config.js` and exported as camelCase (`port`, `dbPath`, `redisOpts`, `rateLimitMax`, etc.) for use across the codebase.
 - **Shared env loader** — `src/load-env.js` is auto-run on require by `src/config.js`. It loads environment-specific `.env` files based on `NODE_ENV` using a priority chain (development tries `.env` → `.env.dev` → `.env.development`). In production, dotenv is skipped entirely — env vars must come from the deployment environment. Both `bin/start.js` and any script requiring `config.js` get correct env values automatically.
+- **Testable seed script** — `src/db/seed.js` accepts `database` and `fetch` parameters via dependency injection, enabling full unit testing without mocking `require()`.
 - **CORS** enabled on all routes
 - **Graceful shutdown** — handles `SIGINT` and `SIGTERM` to close the server and Redis connection cleanly
 

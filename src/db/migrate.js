@@ -8,8 +8,8 @@ if (require.main === module) {
 const { getDb } = require('../database');
 
 function migrate() {
-  const d = getDb();
-  d.exec(`
+  const db = getDb();
+  db.exec(`
     CREATE TABLE IF NOT EXISTS users (
       id      INTEGER PRIMARY KEY,
       name    TEXT,
@@ -68,8 +68,8 @@ if (require.main === module) {
   try {
     migrate();
     console.log('[DB] Migration complete.');
-  } catch (err) {
-    console.error('[DB] Migration failed:', err.message);
+  } catch (error) {
+    console.error('[DB] Migration failed:', error.message);
     process.exit(1);
   }
 }
