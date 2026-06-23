@@ -18,6 +18,9 @@ const redisOpts = REDIS_URL
   ? { url: REDIS_URL }
   : { host: REDIS_HOST, port: REDIS_PORT, db: REDIS_DB, password: REDIS_PASSWORD };
 
+const DEBUG_SQL_STR = process.env.DEBUG_SQL || 'false';
+const DEBUG_SQL = DEBUG_SQL_STR === 'true';
+
 const RATE_LIMIT_ENABLED_STR = process.env.RATE_LIMIT_ENABLED || 'true';
 const RATE_LIMIT_ENABLED = RATE_LIMIT_ENABLED_STR !== 'false';
 const RATE_LIMIT_MAX = parseInt(process.env.RATE_LIMIT_MAX || '100', 10);
@@ -27,6 +30,7 @@ const RATE_LIMIT_WINDOW_SEC = Math.ceil(RATE_LIMIT_WINDOW_MS / 1000);
 module.exports = {
   port: PORT,
   dbPath: DB_PATH,
+  dbDebugSql: DEBUG_SQL,
   redisOpts,
   rateLimitEnabled: RATE_LIMIT_ENABLED,
   rateLimitMax: RATE_LIMIT_MAX,

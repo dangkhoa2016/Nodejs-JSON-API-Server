@@ -4,12 +4,14 @@ if (require.main === module) {
   const { loadEnv } = require('../load-env');
   loadEnv();
 }
-
-const { getDb } = require('../database');
+const { getWrappedDb } = require('../database');
 
 function migrate() {
-  const db = getDb();
-  db.exec(`
+  console.log('[Migrate] Start migrating...');
+
+  try {
+    const db = getWrappedDb();
+    db.exec(`
     CREATE TABLE IF NOT EXISTS users (
       id      INTEGER PRIMARY KEY,
       name    TEXT,
@@ -62,16 +64,16 @@ function migrate() {
       FOREIGN KEY(userId) REFERENCES users(id)
     );
   `);
+
+    console.log('[Migrate] Migration complete.');
+  } catch (error) {
+    console.error('[Migrate] Migration failed:', error.message);
+      throw error;
+  }
 }
 
 if (require.main === module) {
-  try {
-    migrate();
-    console.log('[DB] Migration complete.');
-  } catch (error) {
-    console.error('[DB] Migration failed:', error.message);
-    process.exit(1);
-  }
+  migrate();
 }
 
 module.exports = { migrate };

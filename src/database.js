@@ -1,17 +1,26 @@
 'use strict';
 
 const { DatabaseSync } = require('node:sqlite');
-const { dbPath } = require('./config');
+const { dbPath, dbDebugSql } = require('./config');
+const { wrapDb } = require('./sql-logger');
 
 let db;
+let wrappedDb;
 
 function getDb() {
   if (!db) {
-    db = new DatabaseSync(dbPath);
-    db.exec('PRAGMA journal_mode=WAL');
-    db.exec('PRAGMA foreign_keys=ON');
+    const raw = new DatabaseSync(dbPath);
+    raw.exec('PRAGMA journal_mode=WAL');
+    raw.exec('PRAGMA foreign_keys=ON');
+    db = raw;
   }
   return db;
+}
+
+function getWrappedDb() {
+  if (!dbDebugSql) return getDb();
+  if (!wrappedDb) wrappedDb = wrapDb(getDb());
+  return wrappedDb;
 }
 
 
@@ -60,20 +69,20 @@ function buildWhere(table, query) {
 }
 
 function listAll(table, query = {}) {
-  const d = getDb();
+  const d = getWrappedDb();
   const { where, values } = buildWhere(table, query);
   const rows = d.prepare(`SELECT * FROM ${table}${where}`).all(...values);
   return rows.map((r) => parseRow(table, r));
 }
 
 function getOne(table, id) {
-  const d = getDb();
+  const d = getWrappedDb();
   const row = d.prepare(`SELECT * FROM ${table} WHERE id = ?`).get(id);
   return parseRow(table, row);
 }
 
 function insertOne(table, data) {
-  const d = getDb();
+  const d = getWrappedDb();
   const cols = Object.keys(data);
   const placeholders = cols.map(() => '?').join(',');
   const vals = cols.map((c) => {
@@ -88,7 +97,7 @@ function insertOne(table, data) {
 }
 
 function updateOne(table, id, data, replace = false) {
-  const d = getDb();
+  const d = getWrappedDb();
   const existing = getOne(table, id);
   if (!existing) return null;
   const merged = replace ? { ...data, id } : { ...existing, ...data, id };
@@ -104,7 +113,7 @@ function updateOne(table, id, data, replace = false) {
 }
 
 function deleteOne(table, id) {
-  const d = getDb();
+  const d = getWrappedDb();
   const existing = getOne(table, id);
   if (!existing) return null;
   d.prepare(`DELETE FROM ${table} WHERE id = ?`).run(id);
@@ -112,9 +121,9 @@ function deleteOne(table, id) {
 }
 
 function nextId(table) {
-  const d = getDb();
+  const d = getWrappedDb();
   const row = d.prepare(`SELECT MAX(id) as m FROM ${table}`).get();
   return (row.m || 0) + 1;
 }
 
-module.exports = { getDb, listAll, getOne, insertOne, updateOne, deleteOne, nextId, TABLES };
+module.exports = { getDb, getWrappedDb, listAll, getOne, insertOne, updateOne, deleteOne, nextId, TABLES };

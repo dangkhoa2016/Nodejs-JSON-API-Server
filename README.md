@@ -49,6 +49,7 @@ Environment files are loaded by `src/load-env.js` (auto-run via `src/config.js`)
 | `REDIS_PASSWORD`       | _(none)_    | Redis password (for `AUTH`)            |
 | `RATE_LIMIT_ENABLED`   | `true`      | Enable/disable rate limiting           |
 | `RATE_LIMIT_MAX`       | `100`       | Max requests per time window           |
+| `DEBUG_SQL`            | `false`     | Log all SQL queries to stderr (`true`/`false`) |
 | `RATE_LIMIT_WINDOW_MS` | `60000`     | Time window in milliseconds (default 1 min) |
 | `SEED_API_BASE_URL`    | `https://jsonplaceholder.typicode.com` | Base URL for seed data API |
 
@@ -162,7 +163,8 @@ json-api-server/
 │   └── start.js                 # Entry point — loads .env via src/load-env.js, starts server
 ├── src/
 │   ├── config.js                # Centralized config — auto-loads dotenv via load-env.js, exports camelCase
-│   ├── load-env.js              # Shared dotenv loader (auto-run on require, skips in production)
+│   ├── sql-logger.js            # Shared Proxy wrappers — logs exec/prepare/run/get/all to stderr
+│   ├── load-env.js              # Shared dotenv loader — auto-run on require, skips in production
 │   ├── server.js                # HTTP server, routing, middleware, handlers
 │   ├── database.js              # SQLite layer (node:sqlite) — CRUD operations (reads config.js)
 │   ├── db/
@@ -198,7 +200,7 @@ bin/start.js → src/load-env.js (loads .env per NODE_ENV, skipped in production
       ├── src/redis.js      (pure RESP + AUTH + URL)
       └── src/rate-limiter.js (Redis || in-memory)
 
-# Standalone scripts: npm run db:migrate / npm run db:seed / npm run db:setup
+# Standalone scripts: npm run db:migrate / npm run db:seed / npm run db:setup (config.js loads dotenv automatically)
 ```
 
 ### Request Flow
@@ -234,7 +236,7 @@ This runs comprehensive queries to inspect row counts, column metadata, relation
 
 | Script       | Command                  | Description                                           |
 |--------------|--------------------------|-------------------------------------------------------|
-| `db:migrate` | `npm run db:migrate`     | Creates the 6 tables (loads dotenv when run standalone)  |
+| `db:migrate` | `npm run db:migrate`     | Creates the 6 tables (dotenv loaded by config.js)      |
 | `db:seed`    | `npm run db:seed`        | Fetches seed data from [JSONPlaceholder](https://jsonplaceholder.typicode.com), auto-runs migrate |
 | `db:setup`   | `npm run db:setup`       | Runs `db:seed` (which internally calls migrate)       |
 
@@ -260,8 +262,9 @@ The integration test automatically verifies all endpoints, including CRUD operat
 
 - **Zero runtime dependencies** — only Node.js built-in modules (`http`, `url`, `fs`, `path`, `net`, `node:sqlite`). `dotenv` is a dev dependency.
 - **Pure RESP protocol** — the Redis client in `src/redis.js` implements the Redis serialization protocol over raw TCP sockets without any third-party library. Supports `AUTH` password authentication and `REDIS_URL` connection strings.
-- **Centralized config** — all environment variables are read in `src/config.js` and exported as camelCase (`port`, `dbPath`, `redisOpts`, `rateLimitMax`, etc.) for use across the codebase.
-- **Shared env loader** — `src/load-env.js` is auto-run on require by `src/config.js`. It loads environment-specific `.env` files based on `NODE_ENV` using a priority chain (development tries `.env` → `.env.dev` → `.env.development`). In production, dotenv is skipped entirely — env vars must come from the deployment environment. Both `bin/start.js` and any script requiring `config.js` get correct env values automatically.
+- **Centralized config** — all environment variables are read in `src/config.js` and exported as camelCase (`port`, `dbPath`, `redisOpts`, `rateLimitMax`, `dbDebugSql`, etc.) for use across the codebase.
+- **SQL query logging** — `src/sql-logger.js` exports `wrapDb`/`wrapStmt` Proxy wrappers that log `exec`, `prepare`, `run`, `get`, and `all` calls to stderr. `src/database.js` uses them via `getWrappedDb()` when `DEBUG_SQL=true`.
+- **Multi-environment** — `src/config.js` requires `src/load-env.js` at module level, which auto-loads dotenv using a priority chain based on `NODE_ENV`. Every consumer (server, migrate, seed) simply requires `config.js` and gets correct env values. In production, dotenv is skipped entirely — env vars must come from the deployment environment.
 - **Testable seed script** — `src/db/seed.js` accepts `database` and `fetch` parameters via dependency injection, enabling full unit testing without mocking `require()`.
 - **CORS** enabled on all routes
 - **Graceful shutdown** — handles `SIGINT` and `SIGTERM` to close the server and Redis connection cleanly
