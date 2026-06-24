@@ -15,7 +15,9 @@
     "start": "node bin/start.js",
     "prod": "NODE_ENV=production-local node bin/start.js",
     "dev": "node --watch bin/start.js",
-    "test": "node tests/test.js"
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "engines": {
     "node": ">=22.0.0"
@@ -29,6 +31,8 @@
   ],
   "license": "MIT",
   "devDependencies": {
-    "dotenv": "^17.4.2"
+    "@vitest/coverage-v8": "^4.1.9",
+    "dotenv": "^17.4.2",
+    "vitest": "^4.1.9"
   }
 }

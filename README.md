@@ -174,7 +174,11 @@ json-api-server/
 │   ├── rate-limiter.js          # Rate limiter (Redis or in-memory fallback)
 │   └── redis.js                 # Pure-Node Redis client via RESP protocol over TCP
 ├── tests/
-│   └── test.js                  # Integration tests
+│   ├── server.test.js           # Integration test suite (49 tests)
+│   ├── README.md                # Testing documentation
+│   └── helpers/
+│       ├── index.js             # startServer / stopServer / request utilities
+│       └── seed.js              # Temp DB seeder for tests
 ├── manual/
 │   ├── curl.sh                  # Quick curl commands
 │   └── inspect-queries.sql      # SQL queries for database inspection
@@ -188,7 +192,8 @@ json-api-server/
 ├── package.json                 # Metadata and scripts
 ├── LICENSE                      # MIT license
 ├── README.md                    # Documentation
-└── .gitignore                   # Git ignore rules
+├── .gitignore                   # Git ignore rules
+└── vitest.config.js             # Vitest test runner configuration
 ```
 
 ### Startup Flow
@@ -235,28 +240,27 @@ This runs comprehensive queries to inspect row counts, column metadata, relation
 
 ### Database Scripts
 
-| Script       | Command                  | Description                                           |
-|--------------|--------------------------|-------------------------------------------------------|
-| `db:migrate` | `npm run db:migrate`     | Creates the 6 tables (dotenv loaded by config.js)      |
-| `db:seed`    | `npm run db:seed`        | Fetches seed data from [JSONPlaceholder](https://jsonplaceholder.typicode.com), auto-runs migrate |
-| `db:setup`   | `npm run db:setup`       | Runs `db:seed` (which internally calls migrate)       |
+| Script        | Command                   | Description                                           |
+|---------------|---------------------------|-------------------------------------------------------|
+| `db:migrate`  | `npm run db:migrate`      | Creates the 6 tables (dotenv loaded by config.js)      |
+| `db:seed`     | `npm run db:seed`         | Fetches seed data from [JSONPlaceholder](https://jsonplaceholder.typicode.com), auto-runs migrate |
+| `db:setup`    | `npm run db:setup`        | Runs `db:seed` (which internally calls migrate)       |
+| `test`        | `npm test`                | Run vitest integration tests                          |
+| `test:coverage` | `npm run test:coverage` | Run tests with V8 coverage report                    |
 
 ---
 
 ## Testing
 
-```bash
-# Start server in test mode (uses .env.test: port 3001, separate DB, no rate limit)
-NODE_ENV=test npm start &
+Uses **vitest** with **V8 native coverage**. Each run uses an isolated temp SQLite database and disables rate limiting.
 
-# Run tests (they connect to localhost:3000 by default)
-npm test
-# or
-node tests/test.js
+```bash
+npm test              # Run all tests once
+npm run test:watch    # Watch mode
+npm run test:coverage # With coverage report
 ```
 
-The integration test automatically verifies all endpoints, including CRUD operations, nested routes, filtering, rate-limit headers, and 404 handling.
-
+See [tests/README.md](tests/README.md) for full documentation.
 ---
 
 ## Implementation Notes

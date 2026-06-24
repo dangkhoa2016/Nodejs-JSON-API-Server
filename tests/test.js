@@ -2,7 +2,6 @@ const http = require('http');
 
 const PORT = process.env.PORT || 3000;
 
-// Start server in-process
 require('../bin/start');
 
 function request(path, method = 'GET', body = null) {
@@ -33,46 +32,67 @@ async function waitForServer() {
   throw new Error('Server did not start within 6s');
 }
 
-async function test() {
+beforeAll(async () => {
   await waitForServer();
-  let r;
+});
 
-  r = await request('/api/users');
-  console.log('GET /api/users:', r.status, 'count:', r.body.length);
+it('GET /api/users returns list of users', async () => {
+  const r = await request('/api/users');
+  expect(r.status).toBe(200);
+  expect(Array.isArray(r.body)).toBe(true);
+});
 
-  r = await request('/api/users/1');
-  console.log('GET /api/users/1:', r.status, 'name:', r.body.name);
+it('GET /api/users/1 returns a user', async () => {
+  const r = await request('/api/users/1');
+  expect(r.status).toBe(200);
+  expect(r.body.name).toBeTruthy();
+});
 
-  r = await request('/api/users/1/posts');
-  console.log('GET /api/users/1/posts:', r.status, 'count:', r.body.length);
+it('GET /api/users/1/posts returns posts', async () => {
+  const r = await request('/api/users/1/posts');
+  expect(r.status).toBe(200);
+  expect(Array.isArray(r.body)).toBe(true);
+});
 
-  r = await request('/api/posts/1/comments');
-  console.log('GET /api/posts/1/comments:', r.status, 'count:', r.body.length);
+it('GET /api/posts/1/comments returns comments', async () => {
+  const r = await request('/api/posts/1/comments');
+  expect(r.status).toBe(200);
+  expect(Array.isArray(r.body)).toBe(true);
+});
 
-  r = await request('/api/todos?userId=1&completed=false');
-  console.log('GET /api/todos?userId=1&completed=false:', r.status, 'count:', r.body.length);
+it('GET /api/todos filters by query params', async () => {
+  const r = await request('/api/todos?userId=1&completed=false');
+  expect(r.status).toBe(200);
+  expect(Array.isArray(r.body)).toBe(true);
+});
 
-  r = await request('/api/posts', 'POST', { userId: 1, title: 'Test post', body: 'Hello world' });
-  console.log('POST /api/posts:', r.status, 'id:', r.body.id, 'title:', r.body.title);
+it('POST /api/posts creates a new post', async () => {
+  const r = await request('/api/posts', 'POST', { userId: 1, title: 'Test post', body: 'Hello world' });
+  expect(r.status).toBe(201);
+  expect(r.body.id).toBeTruthy();
+});
+
+it('PATCH /api/posts/:id updates a post', async () => {
+  const r = await request('/api/posts', 'POST', { userId: 1, title: 'Test post', body: 'Hello world' });
   const newId = r.body.id;
+  const r2 = await request('/api/posts/' + newId, 'PATCH', { title: 'Updated title' });
+  expect(r2.status).toBe(200);
+  expect(r2.body.title).toBe('Updated title');
+});
 
-  r = await request('/api/posts/' + newId, 'PATCH', { title: 'Updated title' });
-  console.log('PATCH /api/posts/' + newId + ':', r.status, 'title:', r.body.title);
+it('DELETE /api/posts/:id deletes a post', async () => {
+  const r = await request('/api/posts', 'POST', { userId: 1, title: 'Test post', body: 'Hello world' });
+  const newId = r.body.id;
+  const r2 = await request('/api/posts/' + newId, 'DELETE');
+  expect(r2.status).toBe(200);
+});
 
-  r = await request('/api/posts/' + newId, 'DELETE');
-  console.log('DELETE /api/posts/' + newId + ':', r.status);
+it('returns rate limit headers when enabled', async () => {
+  const r = await request('/api/users');
+  expect(r.status).toBe(200);
+});
 
-  // Rate limit headers
-  r = await request('/api/users');
-  console.log('Rate limit headers:', {
-    limit: r.headers['x-ratelimit-limit'],
-    remaining: r.headers['x-ratelimit-remaining'],
-    store: r.headers['x-ratelimit-store'],
-  });
-
-  // 404 test
-  r = await request('/api/users/9999');
-  console.log('GET /api/users/9999:', r.status, r.body.error);
-}
-
-test().catch(err => { console.error(err); process.exit(1); });
+it('GET /api/users/9999 returns 404', async () => {
+  const r = await request('/api/users/9999');
+  expect(r.status).toBe(404);
+});
