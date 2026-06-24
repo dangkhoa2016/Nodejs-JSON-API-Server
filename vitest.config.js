@@ -15,7 +15,6 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'lcov', 'html'],
       include: ['src/**/*.js'],
-      exclude: ['src/load-env.js', 'src/sql-logger.js'],
     },
   },
 })

@@ -1,5 +1,6 @@
 'use strict';
 
+/* v8 ignore next 3 */
 if (require.main === module) {
   const { loadEnv } = require('../load-env');
   loadEnv();
@@ -68,10 +69,11 @@ function migrate() {
     console.log('[Migrate] Migration complete.');
   } catch (error) {
     console.error('[Migrate] Migration failed:', error.message);
-      throw error;
+    throw error;
   }
 }
 
+/* v8 ignore next 3 */
 if (require.main === module) {
   migrate();
 }

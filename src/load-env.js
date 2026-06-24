@@ -2,6 +2,7 @@
 
 const path = require('path');
 
+/* v8 ignore next 25 — CJS require('dotenv') not tracked by V8 coverage */
 function loadEnv() {
   const env = (process.env.NODE_ENV || 'development').toLowerCase();
 
@@ -26,4 +27,5 @@ function loadEnv() {
   }
 }
 
+/* v8 ignore next — static CJS export not tracked by V8 */
 module.exports = { loadEnv };
