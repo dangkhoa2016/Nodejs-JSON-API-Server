@@ -270,6 +270,7 @@ See [tests/README.md](tests/README.md) for full documentation.
 - **Centralized config** — all environment variables are read in `src/config.js` and exported as camelCase (`port`, `dbPath`, `redisOpts`, `rateLimitMax`, `dbDebugSql`, etc.) for use across the codebase.
 - **SQL query logging** — `src/sql-logger.js` exports `wrapDb`/`wrapStmt` Proxy wrappers that log `exec`, `prepare`, `run`, `get`, and `all` calls to stderr. `src/database.js` uses them via `getWrappedDb()` when `DEBUG_SQL=true`.
 - **Multi-environment** — `src/config.js` requires `src/load-env.js` at module level, which auto-loads dotenv using a priority chain based on `NODE_ENV`. Every consumer (server, migrate, seed) simply requires `config.js` and gets correct env values. In production, dotenv is skipped entirely — env vars must come from the deployment environment.
+- **Lazy rate-limiter config** — `src/middleware/rate-limiter.js` reads config inside `createRateLimiter()` (not at module level), allowing different config values per call and making unit testing straightforward.
 - **Testable seed script** — `src/db/seed.js` accepts `database` and `fetch` parameters via dependency injection, enabling full unit testing without mocking `require()`.
 - **CORS** enabled on all routes
 - **Graceful shutdown** — handles `SIGINT` and `SIGTERM` to close the server and Redis connection cleanly
