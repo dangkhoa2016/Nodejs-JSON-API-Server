@@ -1,4 +1,4 @@
-import { beforeAll, afterAll, describe, it, expect } from 'vitest';
+import { beforeAll, afterAll, describe, it, expect, vi } from 'vitest';
 import { startServer, stopServer, request } from './helpers';
 
 beforeAll(async () => {
@@ -270,6 +270,14 @@ describe('POST — Create', () => {
     expect(res.status).toBe(400);
     expect(res.body.error).toBe('Invalid JSON body');
   });
+
+  it('POST with unknown column returns 400 from db error', async () => {
+    const res = await request('/api/users', {
+      method: 'POST',
+      body: { name: 'test', extra_col: 'value' },
+    });
+    expect(res.status).toBe(400);
+  });
 });
 
 describe('PATCH — Partial update', () => {
@@ -369,4 +377,4 @@ describe('CORS headers on error responses', () => {
     expect(res.status).toBe(404);
     expect(res.headers['access-control-allow-origin']).toBe('*');
   });
-});
+})

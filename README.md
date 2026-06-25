@@ -174,11 +174,24 @@ json-api-server/
 │   ├── rate-limiter.js          # Rate limiter (Redis or in-memory fallback)
 │   └── redis.js                 # Pure-Node Redis client via RESP protocol over TCP
 ├── tests/
-│   ├── server.test.js           # Integration test suite (49 tests)
-│   ├── README.md                # Testing documentation
+│   ├── config/
+│   │   └── config.test.js           # Config defaults and env var branches
+│   ├── db/
+│   │   ├── database.test.js         # Database CRUD, pagination, search, sort
+│   │   ├── migrate.test.js          # Migration success and failure paths
+│   │   └── seed.test.js             # Seed with real DB + mocked deps, JSONPlaceholder fetch
+│   ├── middleware/
+│   │   └── rate-limiter.test.js     # In-memory and Redis rate limiter paths
+│   ├── redis/
+│   │   └── redis.test.js            # RESP protocol encoding/parsing, constructor options
+│   ├── server/
+│   │   └── coverage-printlog.test.js# Server ESM coverage via CJS cache injection
+│   ├── server.test.js               # API integration tests — real HTTP + SQLite (50 tests)
+│   ├── README.md                    # Testing documentation
 │   └── helpers/
-│       ├── index.js             # startServer / stopServer / request utilities
-│       └── seed.js              # Temp DB seeder for tests
+│       ├── coverage.js              # Test-coverage utilities (save/restore/setEnv/clearCjs)
+│       ├── index.js                 # startServer / stopServer / request utilities
+│       └── seed.js                  # Standalone script to create & seed temp DB
 ├── manual/
 │   ├── curl.sh                  # Quick curl commands
 │   └── inspect-queries.sql      # SQL queries for database inspection
@@ -252,12 +265,12 @@ This runs comprehensive queries to inspect row counts, column metadata, relation
 
 ## Testing
 
-Uses **vitest** with **V8 native coverage**. Each run uses an isolated temp SQLite database and disables rate limiting.
+Uses **vitest** with **V8 native coverage**. **101 tests across 8 test files** cover the full stack — from integration tests (real HTTP server + SQLite) to unit tests for every module.
 
 ```bash
 npm test              # Run all tests once
 npm run test:watch    # Watch mode
-npm run test:coverage # With coverage report
+npm run test:coverage # With coverage report (~92% statements, ~87% branches)
 ```
 
 See [tests/README.md](tests/README.md) for full documentation.
@@ -268,6 +281,8 @@ See [tests/README.md](tests/README.md) for full documentation.
 - **Zero runtime dependencies** — only Node.js built-in modules (`http`, `url`, `fs`, `path`, `net`, `node:sqlite`). `dotenv` is a dev dependency.
 - **Pure RESP protocol** — the Redis client in `src/redis.js` implements the Redis serialization protocol over raw TCP sockets without any third-party library. Supports `AUTH` password authentication and `REDIS_URL` connection strings.
 - **Centralized config** — all environment variables are read in `src/config.js` and exported as camelCase (`port`, `dbPath`, `redisOpts`, `rateLimitMax`, `dbDebugSql`, etc.) for use across the codebase.
+- **Lazy rate-limiter config** — `src/rate-limiter.js` reads config inside `createRateLimiter()` (not at module level), allowing different config values per call and making unit testing straightforward.
+- **Testable seed script** — `src/db/seed.js` accepts `database` and `fetch` parameters via dependency injection, enabling full unit testing without mocking `require()`.
 - **SQL query logging** — `src/sql-logger.js` exports `wrapDb`/`wrapStmt` Proxy wrappers that log `exec`, `prepare`, `run`, `get`, and `all` calls to stderr. `src/database.js` uses them via `getWrappedDb()` when `DEBUG_SQL=true`.
 - **Multi-environment** — `src/config.js` requires `src/load-env.js` at module level, which auto-loads dotenv using a priority chain based on `NODE_ENV`. Every consumer (server, migrate, seed) simply requires `config.js` and gets correct env values. In production, dotenv is skipped entirely — env vars must come from the deployment environment.
 - **Lazy rate-limiter config** — `src/middleware/rate-limiter.js` reads config inside `createRateLimiter()` (not at module level), allowing different config values per call and making unit testing straightforward.
