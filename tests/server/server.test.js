@@ -19,8 +19,8 @@ afterAll(() => {
   try { fs.rmSync(tmpDir, { recursive: true, force: true }) } catch {}
 })
 
-vi.mock('../../src/load-env.js', () => ({ loadEnv: () => {} }))
-vi.mock('../../src/config.js', () => configMockFactory())
+vi.mock('../../src/config/load-env.js', () => ({ loadEnv: () => {} }))
+vi.mock('../../src/config/index.js', () => configMockFactory())
 
 describe('server.js', () => {
   it('handles 500 when db throws', async () => {
@@ -37,12 +37,12 @@ describe('server.js', () => {
       nextId: () => 1,
       TABLES: ['users', 'posts', 'comments', 'albums', 'photos', 'todos'],
     }
-    clearCjs('../../src/server.js', '../../src/database.js', '../../src/rate-limiter.js')
-    const resolvedDb = _require.resolve('../../src/database.js')
+    clearCjs('../../src/server/index.js', '../../src/db/index.js', '../../src/middleware/rate-limiter.js')
+    const resolvedDb = _require.resolve('../../src/db/index.js')
     _require.cache[resolvedDb] = { exports: mockDb, id: resolvedDb, filename: resolvedDb, loaded: true }
     try {
       vi.resetModules()
-      const { requestHandler } = await import('../../src/server.js')
+      const { requestHandler } = await import('../../src/server/index.js')
 
       const mkReq = (url, method, body) => ({
         url, method, headers: {}, socket: { remoteAddress: '::1' },
@@ -83,7 +83,7 @@ describe('server.js', () => {
     setEnv({ PORT: '0', REDIS_URL: '' })
     delete process.env.START_SERVER
     vi.resetModules()
-    const mod = await import('../../src/server.js')
+    const mod = await import('../../src/server/index.js')
     const onError = (err) => { throw err }
     mod.server.on('error', onError)
     await new Promise((resolve) => {
@@ -111,8 +111,8 @@ describe('server.js', () => {
       TABLES: ['users', 'posts', 'comments', 'albums', 'photos', 'todos'],
     }
 
-    const resolvedRedis = _require.resolve('../../src/redis.js')
-    const resolvedDb = _require.resolve('../../src/database.js')
+    const resolvedRedis = _require.resolve('../../src/redis/index.js')
+    const resolvedDb = _require.resolve('../../src/db/index.js')
 
     const mockClient = {
       connect: vi.fn().mockResolvedValue(),
@@ -137,9 +137,9 @@ describe('server.js', () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
 
     try {
-      clearCjs('../../src/server.js', '../../src/rate-limiter.js')
+      clearCjs('../../src/server/index.js', '../../src/middleware/rate-limiter.js')
       vi.resetModules()
-      const { printLog } = await import('../../src/server.js')
+      const { printLog } = await import('../../src/server/index.js')
       printLog()
       expect(logSpy.mock.calls.some(c => String(c[0]).includes('Redis'))).toBe(true)
     } finally {
@@ -148,7 +148,7 @@ describe('server.js', () => {
       else delete _require.cache[resolvedRedis]
       if (origDbCache) _require.cache[resolvedDb] = origDbCache
       else delete _require.cache[resolvedDb]
-      clearCjs('../../src/server.js', '../../src/rate-limiter.js')
+      clearCjs('../../src/server/index.js', '../../src/middleware/rate-limiter.js')
     }
     restore(s)
   })
@@ -157,7 +157,7 @@ describe('server.js', () => {
     const s = save('START_SERVER', 'REDIS_URL', 'REDIS_PORT')
     setEnv({ START_SERVER: 'false', REDIS_URL: '', REDIS_PORT: '1' })
     vi.resetModules()
-    const { printLog } = await import('../../src/server.js')
+    const { printLog } = await import('../../src/server/index.js')
     printLog()
     restore(s)
   })
@@ -178,8 +178,8 @@ describe('server.js', () => {
       TABLES: ['users', 'posts', 'comments', 'albums', 'photos', 'todos'],
     }
 
-    const resolvedRedis = _require.resolve('../../src/redis.js')
-    const resolvedDb = _require.resolve('../../src/database.js')
+    const resolvedRedis = _require.resolve('../../src/redis/index.js')
+    const resolvedDb = _require.resolve('../../src/db/index.js')
 
     const mockClient = {
       connect: vi.fn().mockResolvedValue(),
@@ -205,9 +205,9 @@ describe('server.js', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
 
     try {
-      clearCjs('../../src/server.js', '../../src/rate-limiter.js')
+      clearCjs('../../src/server/index.js', '../../src/middleware/rate-limiter.js')
       vi.resetModules()
-      await import('../../src/server.js')
+      await import('../../src/server/index.js')
       expect(logSpy).toHaveBeenCalledWith('[Redis] Connected ✓')
     } finally {
       logSpy.mockRestore()
@@ -216,7 +216,7 @@ describe('server.js', () => {
       else delete _require.cache[resolvedRedis]
       if (origDbCache) _require.cache[resolvedDb] = origDbCache
       else delete _require.cache[resolvedDb]
-      clearCjs('../../src/server.js', '../../src/rate-limiter.js')
+      clearCjs('../../src/server/index.js', '../../src/middleware/rate-limiter.js')
     }
     restore(s)
   })

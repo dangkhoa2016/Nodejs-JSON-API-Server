@@ -1,7 +1,7 @@
 'use strict';
 
 const { DatabaseSync } = require('node:sqlite');
-const { dbPath, dbDebugSql } = require('./config');
+const { dbPath, dbDebugSql } = require('../config');
 const { wrapDb } = require('./sql-logger');
 
 let db;
@@ -22,8 +22,6 @@ function getWrappedDb() {
   if (!wrappedDb) wrappedDb = wrapDb(getDb());
   return wrappedDb;
 }
-
-
 
 function parseRow(table, row) {
   if (!row) return null;

@@ -35,7 +35,7 @@ describe('server.js ESM coverage', () => {
     process.env.RATE_LIMIT_ENABLED = 'false'
 
     vi.resetModules()
-    const mod = await import('../../src/server.js')
+    const mod = await import('../../src/server/index.js')
 
     await new Promise((r) => {
       if (mod.server.listening) return r()
@@ -63,7 +63,7 @@ describe('server.js ESM coverage', () => {
     process.env.RATE_LIMIT_ENABLED = 'false'
 
     vi.resetModules()
-    const mod = await import('../../src/server.js')
+    const mod = await import('../../src/server/index.js')
 
     let res
 

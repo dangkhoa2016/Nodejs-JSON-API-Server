@@ -1,11 +1,11 @@
 'use strict';
 
 if (require.main === module) {
-  const { loadEnv } = require('../load-env');
+  const { loadEnv } = require('../config/load-env');
   loadEnv();
 }
 
-const { getDb } = require('../database');
+const { getWrappedDb } = require('.');
 const { migrate } = require('./migrate');
 
 const BASE = process.env.SEED_API_BASE_URL || 'https://jsonplaceholder.typicode.com';
@@ -16,7 +16,7 @@ async function fetchJSON(url) {
   return res.json();
 }
 
-async function seed({ database = getDb(), fetch: fetchFn = fetchJSON, runMigrate = true } = {}) {
+async function seed({ database = getWrappedDb(), fetch: fetchFn = fetchJSON, runMigrate = true } = {}) {
   if (runMigrate) migrate();
   const db = database;
   const row = db.prepare('SELECT COUNT(*) as rowCount FROM users').get();

@@ -6,21 +6,21 @@ describe('sql-logger.js', () => {
   })
 
   it('returns non-special properties on wrapped stmt', async () => {
-    const { wrapStmt } = await import('../../src/sql-logger.js')
+    const { wrapStmt } = await import('../../src/db/sql-logger.js')
     const stmt = { run: () => {}, customProp: 42 }
     const wrapped = wrapStmt(stmt, 'SELECT 1')
     expect(wrapped.customProp).toBe(42)
   })
 
   it('returns non-special properties on wrapped db', async () => {
-    const { wrapDb } = await import('../../src/sql-logger.js')
+    const { wrapDb } = await import('../../src/db/sql-logger.js')
     const db = { exec: () => {}, prepare: () => ({}), name: 'testdb' }
     const wrapped = wrapDb(db)
     expect(wrapped.name).toBe('testdb')
   })
 
   it('wraps exec and logs SQL', async () => {
-    const { wrapDb } = await import('../../src/sql-logger.js')
+    const { wrapDb } = await import('../../src/db/sql-logger.js')
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
     const rawExec = vi.fn()
     const db = { exec: rawExec, prepare: () => ({}) }
@@ -32,7 +32,7 @@ describe('sql-logger.js', () => {
   })
 
   it('wraps prepare and returns wrapped stmt', async () => {
-    const { wrapDb } = await import('../../src/sql-logger.js')
+    const { wrapDb } = await import('../../src/db/sql-logger.js')
     const rawRun = vi.fn()
     const db = { exec: () => {}, prepare: () => ({ run: rawRun }) }
     const wrapped = wrapDb(db)
@@ -41,7 +41,7 @@ describe('sql-logger.js', () => {
   })
 
   it('wrapped stmt logs SQL on run/get/all', async () => {
-    const { wrapStmt } = await import('../../src/sql-logger.js')
+    const { wrapStmt } = await import('../../src/db/sql-logger.js')
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
     const rawRun = vi.fn()
     const stmt = { run: rawRun }

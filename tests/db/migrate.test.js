@@ -19,8 +19,8 @@ afterAll(() => {
   try { fs.rmSync(tmpDir, { recursive: true, force: true }) } catch {}
 })
 
-vi.mock('../../src/load-env.js', () => ({ loadEnv: () => {} }))
-vi.mock('../../src/config.js', () => configMockFactory())
+vi.mock('../../src/config/load-env.js', () => ({ loadEnv: () => {} }))
+vi.mock('../../src/config/index.js', () => configMockFactory())
 
 describe('migrate.js', () => {
   it('runs migration without error', async () => {
@@ -33,8 +33,8 @@ describe('migrate.js', () => {
   })
 
   it('handles migration failure', async () => {
-    clearCjs('../../src/db/migrate.js', '../../src/database.js', '../../src/config.js')
-    const resolvedDb = _require.resolve('../../src/database.js')
+    clearCjs('../../src/db/migrate.js', '../../src/db/index.js', '../../src/config/index.js')
+    const resolvedDb = _require.resolve('../../src/db/index.js')
     const origDbCache = _require.cache[resolvedDb]
     _require.cache[resolvedDb] = {
       exports: { getWrappedDb: () => { throw new Error('boom') } },

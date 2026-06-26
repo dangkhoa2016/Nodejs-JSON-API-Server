@@ -2,10 +2,10 @@
 
 /* v8 ignore next 3 */
 if (require.main === module) {
-  const { loadEnv } = require('../load-env');
+  const { loadEnv } = require('../config/load-env');
   loadEnv();
 }
-const { getWrappedDb } = require('../database');
+const { getWrappedDb } = require('.');
 
 function migrate() {
   console.log('[Migrate] Start migrating...');

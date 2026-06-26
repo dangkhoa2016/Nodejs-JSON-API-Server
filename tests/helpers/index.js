@@ -28,7 +28,7 @@ export async function startServer() {
   process.env.REDIS_URL = '';
   process.env.RATE_LIMIT_ENABLED = 'false';
 
-  const serverModule = await import('../../src/server.js');
+  const serverModule = await import('../../src/server/index.js');
   serverInstance = serverModule.server;
 
   await new Promise((resolve, reject) => {

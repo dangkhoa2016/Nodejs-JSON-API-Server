@@ -19,14 +19,14 @@ async function closeServer(server) {
 
 describe('redis.js', () => {
   it('encodes RESP commands', async () => {
-    const RedisClient = _require('../../src/redis.js')
+    const RedisClient = _require('../../src/redis/index.js')
     const c = new RedisClient({ host: '127.0.0.1', port: 6379 })
     expect(c._encode('PING')).toBe('*1\r\n$4\r\nPING\r\n')
     expect(c._encode('SET', 'k', 'v')).toBe('*3\r\n$3\r\nSET\r\n$1\r\nk\r\n$1\r\nv\r\n')
   })
 
   it('parses all RESP types', async () => {
-    const RedisClient = _require('../../src/redis.js')
+    const RedisClient = _require('../../src/redis/index.js')
     const c = new RedisClient({ host: '127.0.0.1', port: 6379 })
     const p = (b) => c._parse(Buffer.from(b))
 
@@ -46,13 +46,13 @@ describe('redis.js', () => {
   })
 
   it('throws on unknown RESP type', async () => {
-    const RedisClient = _require('../../src/redis.js')
+    const RedisClient = _require('../../src/redis/index.js')
     const c = new RedisClient({ host: '127.0.0.1', port: 6379 })
     expect(() => c._parse(Buffer.from('!x\r\n'))).toThrow('Unknown RESP type')
   })
 
   it('connect returns early when already connected or connecting', async () => {
-    const RedisClient = _require('../../src/redis.js')
+    const RedisClient = _require('../../src/redis/index.js')
     const c = new RedisClient({ host: '127.0.0.1', port: 6379 })
     c.connected = true
     await expect(c.connect()).resolves.toBeUndefined()
@@ -61,7 +61,7 @@ describe('redis.js', () => {
   })
 
   it('parses URL in constructor', async () => {
-    const RedisClient = _require('../../src/redis.js')
+    const RedisClient = _require('../../src/redis/index.js')
     const c = new RedisClient({ url: 'redis://:secret@myhost:6380/3' })
     expect(c.host).toBe('myhost')
     expect(c.port).toBe(6380)
@@ -70,7 +70,7 @@ describe('redis.js', () => {
   })
 
   it('send and _onData process responses', async () => {
-    const RedisClient = _require('../../src/redis.js')
+    const RedisClient = _require('../../src/redis/index.js')
     const c = new RedisClient({ host: '127.0.0.1', port: 6379 })
     c.socket = { write: vi.fn() }
     const p = c.send('PING')
@@ -80,7 +80,7 @@ describe('redis.js', () => {
   })
 
   it('rejects on error response', async () => {
-    const RedisClient = _require('../../src/redis.js')
+    const RedisClient = _require('../../src/redis/index.js')
     const c = new RedisClient({ host: '127.0.0.1', port: 6379 })
     c.socket = { write: vi.fn() }
     const p = c.send('PING')
@@ -89,7 +89,7 @@ describe('redis.js', () => {
   })
 
   it('handles partial data across multiple _onData calls', async () => {
-    const RedisClient = _require('../../src/redis.js')
+    const RedisClient = _require('../../src/redis/index.js')
     const c = new RedisClient({ host: '127.0.0.1', port: 6379 })
     c.socket = { write: vi.fn() }
     const p = c.send('GET', 'key')
@@ -99,7 +99,7 @@ describe('redis.js', () => {
   })
 
   it('quit sends QUIT and destroys socket', async () => {
-    const RedisClient = _require('../../src/redis.js')
+    const RedisClient = _require('../../src/redis/index.js')
     const c = new RedisClient({ host: '127.0.0.1', port: 6379 })
     const destroy = vi.fn()
     c.socket = { write: vi.fn(), destroy }
@@ -118,7 +118,7 @@ describe('redis.js', () => {
     })
     await new Promise(r => server.listen(0, '127.0.0.1', r))
     const { port } = server.address()
-    const RedisClient = _require('../../src/redis.js')
+    const RedisClient = _require('../../src/redis/index.js')
     const c = new RedisClient({ host: '127.0.0.1', port, password: 's', db: 1 })
     await expect(c.connect()).resolves.toBeUndefined()
     expect(c.connected).toBe(true)
@@ -131,7 +131,7 @@ describe('redis.js', () => {
     })
     await new Promise(r => server.listen(0, '127.0.0.1', r))
     const { port } = server.address()
-    const RedisClient = _require('../../src/redis.js')
+    const RedisClient = _require('../../src/redis/index.js')
     const c = new RedisClient({ host: '127.0.0.1', port })
     await expect(c.connect()).resolves.toBeUndefined()
     expect(c.connected).toBe(true)
@@ -139,7 +139,7 @@ describe('redis.js', () => {
   })
 
   it('uses default constructor options', async () => {
-    const RedisClient = _require('../../src/redis.js')
+    const RedisClient = _require('../../src/redis/index.js')
     const c = new RedisClient()
     expect(c.host).toBe('127.0.0.1')
     expect(c.port).toBe(6379)
@@ -148,7 +148,7 @@ describe('redis.js', () => {
   })
 
   it('parses URL without port and without password', async () => {
-    const RedisClient = _require('../../src/redis.js')
+    const RedisClient = _require('../../src/redis/index.js')
     const c = new RedisClient({ url: 'redis://myhost/3' })
     expect(c.host).toBe('myhost')
     expect(c.port).toBe(6379)
@@ -157,34 +157,34 @@ describe('redis.js', () => {
   })
 
   it('handles _parse offset and array null branches', async () => {
-    const RedisClient = _require('../../src/redis.js')
+    const RedisClient = _require('../../src/redis/index.js')
     const c = new RedisClient({ host: '127.0.0.1', port: 6379 })
     expect(c._parse(Buffer.from('x'), 1)).toBeNull()
     expect(c._parse(Buffer.from('*-1\r\n')).value).toBeNull()
   })
 
   it('parses URL with empty hostname, using default host', async () => {
-    const RedisClient = _require('../../src/redis.js')
+    const RedisClient = _require('../../src/redis/index.js')
     const c = new RedisClient({ url: 'redis:///3' })
     expect(c.host).toBe('127.0.0.1')
     expect(c.db).toBe(3)
   })
 
   it('parses URL with non-numeric path, keeping default db', async () => {
-    const RedisClient = _require('../../src/redis.js')
+    const RedisClient = _require('../../src/redis/index.js')
     const c = new RedisClient({ url: 'redis://host/db' })
     expect(c.host).toBe('host')
     expect(c.db).toBe(0)
   })
 
   it('handles incomplete array data in _parse', async () => {
-    const RedisClient = _require('../../src/redis.js')
+    const RedisClient = _require('../../src/redis/index.js')
     const c = new RedisClient({ host: '127.0.0.1', port: 6379 })
     expect(c._parse(Buffer.from('*2\r\n$3\r\nfoo'))).toBeNull()
   })
 
   it('covers _onData when no response is complete', async () => {
-    const RedisClient = _require('../../src/redis.js')
+    const RedisClient = _require('../../src/redis/index.js')
     const c = new RedisClient({ host: '127.0.0.1', port: 6379 })
     c.socket = { write: vi.fn() }
     c.send('PING')
@@ -193,7 +193,7 @@ describe('redis.js', () => {
   })
 
   it('covers redis helper methods', async () => {
-    const RedisClient = _require('../../src/redis.js')
+    const RedisClient = _require('../../src/redis/index.js')
     const c = new RedisClient({ host: '127.0.0.1', port: 6379 })
     c.socket = { write: vi.fn() }
     c.ping()
@@ -216,7 +216,7 @@ describe('redis.js', () => {
     })
     await new Promise(r => server.listen(0, '127.0.0.1', r))
     const { port } = server.address()
-    const RedisClient = _require('../../src/redis.js')
+    const RedisClient = _require('../../src/redis/index.js')
     const c = new RedisClient({ host: '127.0.0.1', port, password: 's' })
     await expect(c.connect()).rejects.toThrow('ERR invalid password')
     expect(c.connected).toBe(false)
@@ -227,7 +227,7 @@ describe('redis.js', () => {
     const server = net.createServer(() => {})
     await new Promise(r => server.listen(0, '127.0.0.1', r))
     const { port } = server.address()
-    const RedisClient = _require('../../src/redis.js')
+    const RedisClient = _require('../../src/redis/index.js')
     const c = new RedisClient({ host: '127.0.0.1', port })
     c.connect().catch(() => {})
     await new Promise(r => setTimeout(r, 20))
@@ -246,7 +246,7 @@ describe('redis.js connect handlers', () => {
     })
     await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
     const { port } = server.address()
-    const RedisClient = _require('../../src/redis.js')
+    const RedisClient = _require('../../src/redis/index.js')
     const c = new RedisClient({ host: '127.0.0.1', port })
     await c.connect()
     const p = c.send('PING')
@@ -267,7 +267,7 @@ describe('redis.js connect handlers', () => {
     })
     await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
     const { port } = server.address()
-    const RedisClient = _require('../../src/redis.js')
+    const RedisClient = _require('../../src/redis/index.js')
     const c = new RedisClient({ host: '127.0.0.1', port, password: 's', db: 1 })
     await expect(c.connect()).resolves.toBeUndefined()
     expect(c.connected).toBe(true)
@@ -279,7 +279,7 @@ describe('redis.js connect handlers', () => {
     const server = net.createServer(() => {})
     await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
     const { port } = server.address()
-    const RedisClient = _require('../../src/redis.js')
+    const RedisClient = _require('../../src/redis/index.js')
     const c = new RedisClient({ host: '127.0.0.1', port })
     await expect(c.connect()).resolves.toBeUndefined()
     expect(c.connected).toBe(true)
@@ -293,7 +293,7 @@ describe('redis.js connect handlers', () => {
     })
     await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
     const { port } = server.address()
-    const RedisClient = _require('../../src/redis.js')
+    const RedisClient = _require('../../src/redis/index.js')
     const c = new RedisClient({ host: '127.0.0.1', port, password: 's' })
     await expect(c.connect()).rejects.toThrow('ERR invalid password')
     expect(c.connected).toBe(false)

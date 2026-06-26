@@ -19,20 +19,20 @@ afterAll(() => {
   try { fs.rmSync(tmpDir, { recursive: true, force: true }) } catch {}
 })
 
-vi.mock('../../src/load-env.js', () => ({ loadEnv: () => {} }))
-vi.mock('../../src/config.js', () => configMockFactory())
+vi.mock('../../src/config/load-env.js', () => ({ loadEnv: () => {} }))
+vi.mock('../../src/config/index.js', () => configMockFactory())
 
 describe('rate-limiter.js', () => {
   let createRateLimiter
 
   beforeAll(async () => {
-    clearCjs('../../src/rate-limiter.js', '../../src/config.js')
-    const mod = await import('../../src/rate-limiter.js')
+    clearCjs('../../src/middleware/rate-limiter.js', '../../src/config/index.js')
+    const mod = await import('../../src/middleware/rate-limiter.js')
     createRateLimiter = mod.createRateLimiter
   })
 
   function freshLimiter(redis, envOverrides = {}) {
-    clearCjs('../../src/config.js')
+    clearCjs('../../src/config/index.js')
     Object.entries(envOverrides).forEach(([k, v]) => { process.env[k] = v })
     return createRateLimiter(redis)
   }
@@ -128,8 +128,8 @@ describe('rate-limiter.js', () => {
   it('resets memory store entry after window expires', async () => {
     const s = save('RATE_LIMIT_ENABLED', 'RATE_LIMIT_MAX', 'RATE_LIMIT_WINDOW_MS')
     setEnv({ RATE_LIMIT_ENABLED: 'true', RATE_LIMIT_MAX: '2', 'RATE_LIMIT_WINDOW_MS': '60000' })
-    clearCjs('../../src/rate-limiter.js', '../../src/config.js')
-    const { createRateLimiter } = await import('../../src/rate-limiter.js')
+    clearCjs('../../src/middleware/rate-limiter.js', '../../src/config/index.js')
+    const { createRateLimiter } = await import('../../src/middleware/rate-limiter.js')
     const limiter = createRateLimiter(null)
     const req = { headers: {}, socket: { remoteAddress: '7.7.7.7' } }
     const res1 = { setHeader: vi.fn(), writeHead: vi.fn(), end: vi.fn() }

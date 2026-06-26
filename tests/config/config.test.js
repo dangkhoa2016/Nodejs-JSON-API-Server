@@ -19,15 +19,15 @@ afterAll(() => {
   try { fs.rmSync(tmpDir, { recursive: true, force: true }) } catch {}
 })
 
-vi.mock('../../src/load-env.js', () => ({ loadEnv: () => {} }))
-vi.mock('../../src/config.js', () => configMockFactory())
+vi.mock('../../src/config/load-env.js', () => ({ loadEnv: () => {} }))
+vi.mock('../../src/config/index.js', () => configMockFactory())
 
 describe('config.js', () => {
   it('uses defaults when PORT is empty string', async () => {
     const s = save('PORT', 'DB_PATH', 'REDIS_URL', 'RATE_LIMIT_ENABLED')
     setEnv({ PORT: '', DB_PATH: '', REDIS_URL: '', RATE_LIMIT_ENABLED: '' })
     vi.resetModules()
-    const mod = await import('../../src/config.js')
+    const mod = await import('../../src/config/index.js')
     expect(mod.port).toBe(3000)
     expect(mod.dbPath).toContain('storage/data.db')
     expect(mod.redisOpts.host).toBe('127.0.0.1')
@@ -49,7 +49,7 @@ describe('config.js', () => {
     delete process.env.REDIS_PASSWORD
     delete process.env.DEBUG_SQL
     vi.resetModules()
-    const mod = await import('../../src/config.js')
+    const mod = await import('../../src/config/index.js')
     expect(mod.port).toBe(3000)
     expect(mod.rateLimitEnabled).toBe(true)
     expect(mod.rateLimitMax).toBe(100)
@@ -66,7 +66,7 @@ describe('config.js', () => {
     const s = save('REDIS_URL')
     process.env.REDIS_URL = 'redis://u:p@h:6380/2'
     vi.resetModules()
-    const mod = await import('../../src/config.js')
+    const mod = await import('../../src/config/index.js')
     expect(mod.redisOpts.url).toBe('redis://u:p@h:6380/2')
     restore(s)
   })
@@ -86,7 +86,7 @@ describe('config.js', () => {
       RATE_LIMIT_WINDOW_MS: '15000',
     })
     vi.resetModules()
-    const mod = await import('../../src/config.js')
+    const mod = await import('../../src/config/index.js')
     expect(mod.port).toBe(4000)
     expect(mod.dbPath).toBe(path.join(tmpDir, 'config.db'))
     expect(mod.redisOpts).toEqual({ host: 'redis.local', port: 6380, db: 2, password: 'secret' })
@@ -104,8 +104,8 @@ describe('config.js', () => {
     process.env.RATE_LIMIT_ENABLED = 'false'
     process.env.DB_PATH = '/custom/data.db'
     process.env.DEBUG_SQL = 'true'
-    clearCjs('../../src/config.js', '../../src/load-env.js')
-    const mod = _require('../../src/config.js')
+    clearCjs('../../src/config/index.js', '../../src/config/load-env.js')
+    const mod = _require('../../src/config/index.js')
     expect(mod.port).toBe(5000)
     expect(mod.redisOpts).toEqual({ url: 'redis://custom:6379' })
     expect(mod.rateLimitEnabled).toBe(false)
@@ -118,8 +118,8 @@ describe('config.js', () => {
     const s = save('PORT', 'RATE_LIMIT_ENABLED', 'REDIS_URL', 'DB_PATH', 'REDIS_HOST', 'REDIS_PORT', 'REDIS_DB', 'REDIS_PASSWORD', 'DEBUG_SQL', 'RATE_LIMIT_MAX', 'RATE_LIMIT_WINDOW_MS')
     delete process.env.PORT
     delete process.env.RATE_LIMIT_ENABLED
-    clearCjs('../../src/config.js', '../../src/load-env.js')
-    const mod = _require('../../src/config.js')
+    clearCjs('../../src/config/index.js', '../../src/config/load-env.js')
+    const mod = _require('../../src/config/index.js')
     expect(mod.port).toBe(3000)
     expect(mod.rateLimitEnabled).toBe(true)
     restore(s)

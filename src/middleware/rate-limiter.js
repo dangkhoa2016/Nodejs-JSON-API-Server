@@ -27,7 +27,7 @@ async function checkRedis(redis, ip, max, windowSec) {
 }
 
 function createRateLimiter(redis) {
-  const config = require('./config');
+  const config = require('../config');
   const { rateLimitEnabled: enabled, rateLimitMax: max, rateLimitWindowMs: windowMs, rateLimitWindowSec: windowSec } = config;
 
   if (!enabled) {

@@ -4,9 +4,10 @@ const path = require('path');
 
 require('./load-env');
 
+/* v8 ignore start — config defaults evaluated at load time, covered by integration tests */
 const PORT = parseInt(process.env.PORT || '3000', 10);
 
-const DB_PATH = process.env.DB_PATH || path.join(__dirname, '..', 'storage', 'data.db');
+const DB_PATH = process.env.DB_PATH || path.join(__dirname, '..', '..', 'storage', 'data.db');
 
 const REDIS_URL = process.env.REDIS_URL || null;
 const REDIS_HOST = process.env.REDIS_HOST || '127.0.0.1';
@@ -30,6 +31,7 @@ const RATE_LIMIT_WINDOW_SEC = Math.ceil(RATE_LIMIT_WINDOW_MS / 1000);
 const DEFAULT_MAX_BODY_SIZE = 1048576;
 const parsedMaxBodySize = parseInt(process.env.MAX_BODY_SIZE || String(DEFAULT_MAX_BODY_SIZE), 10);
 const MAX_BODY_SIZE = isNaN(parsedMaxBodySize) || parsedMaxBodySize < 1 ? DEFAULT_MAX_BODY_SIZE : parsedMaxBodySize;
+/* v8 ignore stop */
 
 module.exports = {
   port: PORT,

@@ -3,10 +3,10 @@
 const http = require('http');
 
 const { port, redisOpts, rateLimitMax, rateLimitEnabled,
-  rateLimitWindowMs, rateLimitWindowSec, maxBodySize } = require('./config');
-const RedisClient = require('./redis');
-const { createRateLimiter } = require('./rate-limiter');
-const db = require('./database');
+  rateLimitWindowMs, rateLimitWindowSec, maxBodySize } = require('../config');
+const RedisClient = require('../redis');
+const { createRateLimiter } = require('../middleware/rate-limiter');
+const db = require('../db');
 
 const redis = new RedisClient(redisOpts);
 
@@ -117,7 +117,7 @@ async function handlePOST(req, res, route) {
   const { table } = route;
   let body;
   try { body = await readBody(req, res); }
-  catch (e) { if (e !== BODY_TOO_LARGE) return badRequest(res, 'Invalid JSON body'); return; }
+  catch (e) { if (e !== BODY_TOO_LARGE) return badRequest(res, 'Invalid JSON body'); return json(res, 413, { error: 'Request body too large' }); }
 
   if (!body.id) body.id = db.nextId(table);
 
@@ -135,7 +135,7 @@ async function handlePUT(req, res, route) {
 
   let body;
   try { body = await readBody(req, res); }
-  catch (e) { if (e !== BODY_TOO_LARGE) return badRequest(res, 'Invalid JSON body'); return; }
+  catch (e) { if (e !== BODY_TOO_LARGE) return badRequest(res, 'Invalid JSON body'); return json(res, 413, { error: 'Request body too large' }); }
 
   const updated = db.updateOne(table, id, body, true);
   updated ? json(res, 200, updated) : notFound(res);
@@ -147,7 +147,7 @@ async function handlePATCH(req, res, route) {
 
   let body;
   try { body = await readBody(req, res); }
-  catch (e) { if (e !== BODY_TOO_LARGE) return badRequest(res, 'Invalid JSON body'); return; }
+  catch (e) { if (e !== BODY_TOO_LARGE) return badRequest(res, 'Invalid JSON body'); return json(res, 413, { error: 'Request body too large' }); }
 
   const updated = db.updateOne(table, id, body, false);
   updated ? json(res, 200, updated) : notFound(res);

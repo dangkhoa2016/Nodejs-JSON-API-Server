@@ -19,15 +19,15 @@ afterAll(() => {
   try { fs.rmSync(tmpDir, { recursive: true, force: true }) } catch {}
 })
 
-vi.mock('../../src/load-env.js', () => ({ loadEnv: () => {} }))
-vi.mock('../../src/config.js', () => configMockFactory())
+vi.mock('../../src/config/load-env.js', () => ({ loadEnv: () => {} }))
+vi.mock('../../src/config/index.js', () => configMockFactory())
 
 describe('database.js', () => {
   it('covers getWrappedDb with DEBUG_SQL enabled', async () => {
     const s = save('DEBUG_SQL', 'DB_PATH')
     setEnv({ DEBUG_SQL: 'true', DB_PATH: path.join(tmpDir, 'db1.db') })
     vi.resetModules()
-    const mod = await import('../../src/database.js')
+    const mod = await import('../../src/db/index.js')
     const w = mod.getWrappedDb()
     expect(w).toBeDefined()
     const w2 = mod.getWrappedDb()
@@ -39,7 +39,7 @@ describe('database.js', () => {
     const s = save('DB_PATH')
     process.env.DB_PATH = path.join(tmpDir, 'db2.db')
     vi.resetModules()
-    const mod = await import('../../src/database.js')
+    const mod = await import('../../src/db/index.js')
     const first = mod.getDb()
     const second = mod.getDb()
     expect(first).toBe(second)
@@ -49,9 +49,9 @@ describe('database.js', () => {
   it('covers getWrappedDb without DEBUG_SQL', async () => {
     const s = save('DEBUG_SQL', 'DB_PATH')
     setEnv({ DEBUG_SQL: 'false', DB_PATH: path.join(tmpDir, 'db3.db') })
-    clearCjs('../../src/database.js', '../../src/config.js')
+    clearCjs('../../src/db/index.js', '../../src/config/index.js')
     vi.resetModules()
-    const mod = await import('../../src/database.js')
+    const mod = await import('../../src/db/index.js')
     expect(mod.getWrappedDb()).toBe(mod.getDb())
     restore(s)
   })
@@ -60,9 +60,9 @@ describe('database.js', () => {
     const dbPath = path.join(tmpDir, 'db-crud.db')
     const s = save('DB_PATH', 'DEBUG_SQL')
     setEnv({ DB_PATH: dbPath, DEBUG_SQL: 'true' })
-    clearCjs('../../src/database.js', '../../src/config.js')
+    clearCjs('../../src/db/index.js', '../../src/config/index.js')
     vi.resetModules()
-    const mod = await import('../../src/database.js')
+    const mod = await import('../../src/db/index.js')
     const db = mod.getDb()
     db.exec(`
       CREATE TABLE users (
@@ -113,9 +113,9 @@ describe('database.js', () => {
     const dbPath = path.join(tmpDir, 'db-write.db')
     const s = save('DB_PATH', 'DEBUG_SQL')
     setEnv({ DB_PATH: dbPath, DEBUG_SQL: 'false' })
-    clearCjs('../../src/database.js', '../../src/config.js')
+    clearCjs('../../src/db/index.js', '../../src/config/index.js')
     vi.resetModules()
-    const mod = await import('../../src/database.js')
+    const mod = await import('../../src/db/index.js')
     const db = mod.getDb()
     db.exec(`
       CREATE TABLE users (

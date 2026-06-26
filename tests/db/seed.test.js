@@ -21,12 +21,12 @@ afterAll(() => {
   try { fs.rmSync(tmpDir, { recursive: true, force: true }) } catch {}
 })
 
-vi.mock('../../src/load-env.js', () => ({ loadEnv: () => {} }))
-vi.mock('../../src/config.js', () => configMockFactory())
+vi.mock('../../src/config/load-env.js', () => ({ loadEnv: () => {} }))
+vi.mock('../../src/config/index.js', () => configMockFactory())
 
 describe('seed.js', () => {
   afterEach(() => {
-    clearCjs('../../src/db/seed.js', '../../src/db/migrate.js', '../../src/database.js', '../../src/config.js')
+    clearCjs('../../src/db/seed.js', '../../src/db/migrate.js', '../../src/db/index.js', '../../src/config/index.js')
   })
 
   it('imports and migrate runs, seed returns early when DB has data', async () => {
