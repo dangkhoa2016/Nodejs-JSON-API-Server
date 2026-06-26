@@ -2,7 +2,6 @@ import { defineConfig } from 'vitest/config'
 
 process.env.NODE_ENV = 'test';
 process.env.PORT = '3199';
-process.env.RATE_LIMIT_ENABLED = 'false';
 
 export default defineConfig({
   test: {

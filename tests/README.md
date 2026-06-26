@@ -23,24 +23,26 @@ tests/
     database.test.js                 # Database CRUD, pagination, search, sort (5 tests)
     migrate.test.js                  # Migration success and failure paths (2 tests)
     seed.test.js                     # Seed with real DB + mocked deps, JSONPlaceholder fetch (5 tests)
+    sql-logger.test.js               # SQL query logger wrapping tests (5 tests)
   middleware/
     rate-limiter.test.js             # In-memory and Redis rate limiter paths (6 tests)
   redis/
     redis.test.js                    # RESP protocol encoding/parsing, constructor options (25 tests)
   server/
     coverage-printlog.test.js        # Server ESM coverage via CJS cache injection (2 tests)
-  server.test.js                     # API integration tests — real HTTP + SQLite (50 tests)
+    integration.test.js              # API integration tests — real HTTP + SQLite (50 tests)
+    server.test.js                   # Server request handler and startup paths (5 tests)
   helpers/
-    coverage.js                      # Test-coverage utilities (save/restore/setEnv/clearCjs)
+    coverage.js                      # Shared test utilities (save/restore/setEnv/clearCjs)
     index.js                         # startServer / stopServer / request utilities
     seed.js                          # Standalone script to create & seed temp DB
 ```
 
-**Total: 101 tests across 8 test files.**
+**Total: 111 tests across 10 test files.**
 
 ## Test design
 
-### Integration tests (`server.test.js`)
+### Integration tests (`tests/server/integration.test.js`)
 
 Each run creates an isolated temp SQLite database, seeds it with test data via a child process (`helpers/seed.js`), then starts the server on port 3199. Tests make real HTTP requests and validate the full request lifecycle. Rate limiting is disabled via `RATE_LIMIT_ENABLED=false` in the test helper. The temp directory is cleaned up after all tests finish.
 
@@ -55,8 +57,10 @@ Unit tests cover every source module individually. Each module has its own test 
 | `rate-limiter.js`   | `tests/middleware/rate-limiter.test.js` | Module imported once; `createRateLimiter()` with different configs per test |
 | `redis.js`          | `tests/redis/redis.test.js`  | RESP encoding/parsing directly; constructor options |
 | `server.js`         | `tests/server/coverage-printlog.test.js` | `requestHandler()` with mock req/res; CJS cache injection for DB mock |
+| `server.js`         | `tests/server/server.test.js` | `requestHandler()` with mock req/res; CJS cache injection for DB mock |
 | `migrate.js`        | `tests/db/migrate.test.js`   | Real migration + corrupt DB failure path |
 | `seed.js`           | `tests/db/seed.test.js`      | Dependency injection — `database` and `fetch` injected |
+| `sql-logger.js`     | `tests/db/sql-logger.test.js`| Proxy wrapper behavior on exec/prepare/run/get/all |
 
 ### Key testing patterns
 
@@ -82,18 +86,8 @@ npm run test:coverage
 | Metric      | Coverage |
 |-------------|----------|
 | Statements  | ~92%    |
-| Branches    | ~87%    |
-| Functions   | ~90%    |
-| Lines       | ~96%    |
+| Branches    | ~89%    |
+| Functions   | ~93%    |
+| Lines       | ~94%    |
 
-Key files:
-
-| File          | Statements | Lines |
-|---------------|-----------|-------|
-| server.js     | ~86%      | ~91%  |
-| database.js   | ~92%      | ~97%  |
-| config.js     | 100%      | 100%  |
-| rate-limiter.js | ~90%    | ~95%  |
-| redis.js      | ~78%      | ~82%  |
-
-Coverage for `rate-limiter.js` and `redis.js` is incomplete because Redis is unavailable in test mode (falls back to in-memory). The `migrate.js` and `seed.js` CLI scripts are not fully covered since some paths run as child processes.
+All source files reach moderate coverage. Low-coverage areas: `rate-limiter.js` and `redis.js` (Redis unavailable in test mode, falls back to in-memory); `migrate.js` and `seed.js` CLI paths run as child processes.

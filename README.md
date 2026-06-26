@@ -175,18 +175,20 @@ json-api-server/
 │   └── redis.js                 # Pure-Node Redis client via RESP protocol over TCP
 ├── tests/
 │   ├── config/
-│   │   └── config.test.js           # Config defaults and env var branches
+│   │   └── config.test.js           # Config defaults and env var branches (6)
 │   ├── db/
-│   │   ├── database.test.js         # Database CRUD, pagination, search, sort
-│   │   ├── migrate.test.js          # Migration success and failure paths
-│   │   └── seed.test.js             # Seed with real DB + mocked deps, JSONPlaceholder fetch
+│   │   ├── database.test.js         # Database CRUD, pagination, search, sort (5)
+│   │   ├── migrate.test.js          # Migration success and failure paths (2)
+│   │   ├── seed.test.js             # Seed with real DB + mocked deps, JSONPlaceholder fetch (5)
+│   │   └── sql-logger.test.js       # SQL query logger wrapping (5)
 │   ├── middleware/
-│   │   └── rate-limiter.test.js     # In-memory and Redis rate limiter paths
+│   │   └── rate-limiter.test.js     # In-memory and Redis rate limiter paths (6)
 │   ├── redis/
-│   │   └── redis.test.js            # RESP protocol encoding/parsing, constructor options
+│   │   └── redis.test.js            # RESP protocol encoding/parsing, constructor options (25)
 │   ├── server/
-│   │   └── coverage-printlog.test.js# Server ESM coverage via CJS cache injection
-│   ├── server.test.js               # API integration tests — real HTTP + SQLite (50 tests)
+│   │   ├── coverage-printlog.test.js # V8 coverage: printLog, startServer, 500 catch (2)
+│   │   ├── integration.test.js      # API integration tests — real HTTP + SQLite (50)
+│   │   └── server.test.js           # Server request handler and startup paths (5)
 │   ├── README.md                    # Testing documentation
 │   └── helpers/
 │       ├── coverage.js              # Test-coverage utilities (save/restore/setEnv/clearCjs)
@@ -217,7 +219,7 @@ bin/start.js → src/load-env.js (loads .env per NODE_ENV, skipped in production
       ├── src/config.js     (centralized config, auto-loads dotenv)
       ├── src/database.js   (SQLite CRUD)
       ├── src/redis.js      (pure RESP + AUTH + URL)
-      └── src/rate-limiter.js (Redis || in-memory)
+      └── src/rate-limiter.js (Redis || in-memory, config loaded lazily per call)
 
 # Standalone scripts: npm run db:migrate / npm run db:seed / npm run db:setup (config.js loads dotenv automatically)
 ```
@@ -265,12 +267,12 @@ This runs comprehensive queries to inspect row counts, column metadata, relation
 
 ## Testing
 
-Uses **vitest** with **V8 native coverage**. **101 tests across 8 test files** cover the full stack — from integration tests (real HTTP server + SQLite) to unit tests for every module.
+Uses **vitest** with **V8 native coverage**. 111 tests across 10 test files cover the full stack — from integration tests (real HTTP server + SQLite) to unit tests for every module.
 
 ```bash
 npm test              # Run all tests once
 npm run test:watch    # Watch mode
-npm run test:coverage # With coverage report (~92% statements, ~87% branches)
+npm run test:coverage # With coverage report (~92% statements, ~89% branches)
 ```
 
 See [tests/README.md](tests/README.md) for full documentation.

@@ -26,6 +26,7 @@ export async function startServer() {
   process.env.DB_PATH = dbPath;
   process.env.START_SERVER = 'false';
   process.env.REDIS_URL = '';
+  process.env.RATE_LIMIT_ENABLED = 'false';
 
   const serverModule = await import('../../src/server.js');
   serverInstance = serverModule.server;

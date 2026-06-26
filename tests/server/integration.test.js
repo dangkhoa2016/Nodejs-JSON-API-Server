@@ -1,5 +1,5 @@
-import { beforeAll, afterAll, describe, it, expect, vi } from 'vitest';
-import { startServer, stopServer, request } from './helpers';
+import { beforeAll, afterAll, describe, it, expect } from 'vitest';
+import { startServer, stopServer, request } from '../helpers';
 
 beforeAll(async () => {
   await startServer();
