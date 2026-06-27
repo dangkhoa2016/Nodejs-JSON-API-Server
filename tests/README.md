@@ -19,6 +19,7 @@ npm run test:coverage    # Run with coverage report
 tests/
   config/
     config.test.js                   # Config defaults and env var branches (8 tests)
+    load-env.test.js                 # Load-env file loading chain and error paths (7 tests)
   db/
     database.test.js                 # Database CRUD, pagination, search, sort (5 tests)
     migrate.test.js                  # Migration success and failure paths (2 tests)
@@ -38,7 +39,7 @@ tests/
     seed.js                          # Standalone script to create & seed temp DB
 ```
 
-**Total: 114 tests across 10 test files.**
+**Total: 121 tests across 11 test files.**
 
 ## Test design
 

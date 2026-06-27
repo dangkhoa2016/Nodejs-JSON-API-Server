@@ -179,7 +179,8 @@ json-api-server/
 │       └── index.js              # HTTP server, routing, middleware, handlers
 ├── tests/
 │   ├── config/
-│   │   └── config.test.js           # Config defaults and env var branches (8)
+│   │   ├── config.test.js           # Config defaults and env var branches (8)
+│   │   └── load-env.test.js         # Load-env file loading chain and error paths (7)
 │   ├── db/
 │   │   ├── database.test.js         # Database CRUD, pagination, search, sort (5)
 │   │   ├── migrate.test.js          # Migration success and failure paths (2)
@@ -271,7 +272,7 @@ This runs comprehensive queries to inspect row counts, column metadata, relation
 
 ## Testing
 
-Uses **vitest** with **V8 native coverage**. **114 tests across 10 test files** cover the full stack — from integration tests (real HTTP server + SQLite) to unit tests for every module.
+Uses **vitest** with **V8 native coverage**. **121 tests across 11 test files** cover the full stack — from integration tests (real HTTP server + SQLite) to unit tests for every module.
 
 ```bash
 npm test              # Run all tests once

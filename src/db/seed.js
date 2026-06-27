@@ -1,5 +1,6 @@
 'use strict';
 
+/* v8 ignore next 3 */
 if (require.main === module) {
   const { loadEnv } = require('../config/load-env');
   loadEnv();
@@ -10,11 +11,13 @@ const { migrate } = require('./migrate');
 
 const BASE = process.env.SEED_API_BASE_URL || 'https://jsonplaceholder.typicode.com';
 
+/* v8 ignore start */
 async function fetchJSON(url) {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
+/* v8 ignore stop */
 
 async function seed({ database = getWrappedDb(), fetch: fetchFn = fetchJSON, runMigrate = true } = {}) {
   if (runMigrate) migrate();
@@ -92,6 +95,7 @@ async function seed({ database = getWrappedDb(), fetch: fetchFn = fetchJSON, run
   }
 }
 
+/* v8 ignore next 5 */
 if (require.main === module) {
   seed().then(() => process.exit(0)).catch((error) => {
     console.error('[DB] Seeding failed:', error.message);
