@@ -19,20 +19,19 @@ afterAll(() => {
   try { fs.rmSync(tmpDir, { recursive: true, force: true }) } catch {}
 })
 
-vi.mock('../../src/config/load-env.js', () => ({ loadEnv: () => {} }))
 vi.mock('../../src/config/index.js', () => configMockFactory())
 
 describe('migrate.js', () => {
-  it('runs migration without error', async () => {
+  it('runs migration without error', () => {
     const s = save('DB_PATH')
     process.env.DB_PATH = path.join(tmpDir, 'migrate.db')
-    vi.resetModules()
-    const { migrate } = await import('../../src/db/migrate.js')
+    clearCjs('../../src/db/migrate.js', '../../src/db/index.js', '../../src/config/index.js')
+    const { migrate } = _require('../../src/db/migrate.js')
     expect(() => migrate()).not.toThrow()
     restore(s)
   })
 
-  it('handles migration failure', async () => {
+  it('handles migration failure', () => {
     clearCjs('../../src/db/migrate.js', '../../src/db/index.js', '../../src/config/index.js')
     const resolvedDb = _require.resolve('../../src/db/index.js')
     const origDbCache = _require.cache[resolvedDb]
@@ -41,8 +40,8 @@ describe('migrate.js', () => {
       id: resolvedDb, filename: resolvedDb, loaded: true,
     }
     try {
-      vi.resetModules()
-      const { migrate } = await import('../../src/db/migrate.js')
+      clearCjs('../../src/db/migrate.js')
+      const { migrate } = _require('../../src/db/migrate.js')
       expect(() => migrate()).toThrow('boom')
     } finally {
       if (origDbCache) _require.cache[resolvedDb] = origDbCache

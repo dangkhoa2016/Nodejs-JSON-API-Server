@@ -18,7 +18,7 @@ npm run test:coverage    # Run with coverage report
 ```
 tests/
   config/
-    config.test.js                   # Config defaults and env var branches (6 tests)
+    config.test.js                   # Config defaults and env var branches (8 tests)
   db/
     database.test.js                 # Database CRUD, pagination, search, sort (5 tests)
     migrate.test.js                  # Migration success and failure paths (2 tests)
@@ -29,7 +29,7 @@ tests/
   redis/
     redis.test.js                    # RESP protocol encoding/parsing, constructor options (25 tests)
   server/
-    coverage-printlog.test.js        # Server ESM coverage via CJS cache injection (2 tests)
+    coverage-printlog.test.js        # V8 coverage: printLog, startServer, 500 catch (3 tests)
     integration.test.js              # API integration tests — real HTTP + SQLite (50 tests)
     server.test.js                   # Server request handler and startup paths (5 tests)
   helpers/
@@ -38,7 +38,7 @@ tests/
     seed.js                          # Standalone script to create & seed temp DB
 ```
 
-**Total: 111 tests across 10 test files.**
+**Total: 114 tests across 10 test files.**
 
 ## Test design
 
@@ -56,8 +56,8 @@ Unit tests cover every source module individually. Each module has its own test 
 | `db/index.js`                  | `tests/db/database.test.js`   | Real `node:sqlite` databases with per-test temp files |
 | `middleware/rate-limiter.js`   | `tests/middleware/rate-limiter.test.js` | Module imported once; `createRateLimiter()` with different configs per test |
 | `redis/index.js`               | `tests/redis/redis.test.js`  | RESP encoding/parsing directly; constructor options |
-| `server/index.js`              | `tests/server/coverage-printlog.test.js` | `requestHandler()` with mock req/res; CJS cache injection for DB mock |
 | `server/index.js`              | `tests/server/server.test.js` | `requestHandler()` with mock req/res; CJS cache injection for DB mock |
+| `server/index.js` (ESM)        | `tests/server/coverage-printlog.test.js` | Dynamic `import()` for V8-covered printLog, startServer, 500 catch |
 | `db/migrate.js`                | `tests/db/migrate.test.js`   | Real migration + corrupt DB failure path |
 | `db/seed.js`                   | `tests/db/seed.test.js`      | Dependency injection — `database` and `fetch` injected |
 | `db/sql-logger.js`             | `tests/db/sql-logger.test.js`| Proxy wrapper behavior on exec/prepare/run/get/all |
@@ -85,9 +85,9 @@ npm run test:coverage
 
 | Metric      | Coverage |
 |-------------|----------|
-| Statements  | ~92%    |
-| Branches    | ~89%    |
-| Functions   | ~93%    |
-| Lines       | ~94%    |
+| Statements  | ~98%    |
+| Branches    | ~98%    |
+| Functions   | ~96%    |
+| Lines       | ~98%    |
 
-All source files reach moderate coverage. Low-coverage areas: `rate-limiter.js` and `redis.js` (Redis unavailable in test mode, falls back to in-memory); `migrate.js` and `seed.js` CLI paths run as child processes.
+All source files reach high coverage. The main low-coverage area is `seed.js` CLI paths (25% functions, 86.3% statements) — the `seedDatabase()` entry point and `process.on('uncaughtException')` handler run as child processes and escape V8 tracking.

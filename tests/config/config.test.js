@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterAll } from 'vitest'
+import { describe, it, expect, vi, afterAll, beforeAll } from 'vitest'
 import fs from 'fs'
 import path from 'path'
 import { mkdtempSync } from 'fs'
@@ -19,7 +19,6 @@ afterAll(() => {
   try { fs.rmSync(tmpDir, { recursive: true, force: true }) } catch {}
 })
 
-vi.mock('../../src/config/load-env.js', () => ({ loadEnv: () => {} }))
 vi.mock('../../src/config/index.js', () => configMockFactory())
 
 describe('config.js', () => {
@@ -98,12 +97,13 @@ describe('config.js', () => {
   })
 
   it('covers branches in the real config module via CJS require', () => {
-    const s = save('PORT', 'DB_PATH', 'REDIS_URL', 'RATE_LIMIT_ENABLED', 'REDIS_HOST', 'REDIS_PORT', 'REDIS_DB', 'REDIS_PASSWORD', 'DEBUG_SQL', 'RATE_LIMIT_MAX', 'RATE_LIMIT_WINDOW_MS')
+    const s = save('PORT', 'DB_PATH', 'REDIS_URL', 'RATE_LIMIT_ENABLED', 'REDIS_HOST', 'REDIS_PORT', 'REDIS_DB', 'REDIS_PASSWORD', 'DEBUG_SQL', 'RATE_LIMIT_MAX', 'RATE_LIMIT_WINDOW_MS', 'MAX_BODY_SIZE')
     process.env.PORT = '5000'
     process.env.REDIS_URL = 'redis://custom:6379'
     process.env.RATE_LIMIT_ENABLED = 'false'
     process.env.DB_PATH = '/custom/data.db'
     process.env.DEBUG_SQL = 'true'
+    process.env.MAX_BODY_SIZE = '2097152'
     clearCjs('../../src/config/index.js', '../../src/config/load-env.js')
     const mod = _require('../../src/config/index.js')
     expect(mod.port).toBe(5000)
@@ -111,17 +111,38 @@ describe('config.js', () => {
     expect(mod.rateLimitEnabled).toBe(false)
     expect(mod.dbDebugSql).toBe(true)
     expect(mod.dbPath).toBe('/custom/data.db')
+    expect(mod.maxBodySize).toBe(2097152)
     restore(s)
   })
 
   it('covers PORT default and rate limit enabled branches via CJS', () => {
-    const s = save('PORT', 'RATE_LIMIT_ENABLED', 'REDIS_URL', 'DB_PATH', 'REDIS_HOST', 'REDIS_PORT', 'REDIS_DB', 'REDIS_PASSWORD', 'DEBUG_SQL', 'RATE_LIMIT_MAX', 'RATE_LIMIT_WINDOW_MS')
+    const s = save('PORT', 'RATE_LIMIT_ENABLED', 'MAX_BODY_SIZE', 'REDIS_URL', 'DB_PATH', 'REDIS_HOST', 'REDIS_PORT', 'REDIS_DB', 'REDIS_PASSWORD', 'DEBUG_SQL', 'RATE_LIMIT_MAX', 'RATE_LIMIT_WINDOW_MS')
     delete process.env.PORT
     delete process.env.RATE_LIMIT_ENABLED
+    delete process.env.MAX_BODY_SIZE
     clearCjs('../../src/config/index.js', '../../src/config/load-env.js')
     const mod = _require('../../src/config/index.js')
     expect(mod.port).toBe(3000)
     expect(mod.rateLimitEnabled).toBe(true)
+    expect(mod.maxBodySize).toBe(1048576)
+    restore(s)
+  })
+
+  it('falls back to default maxBodySize when env var is not a valid integer', () => {
+    const s = save('MAX_BODY_SIZE')
+    process.env.MAX_BODY_SIZE = 'abc'
+    clearCjs('../../src/config/index.js', '../../src/config/load-env.js')
+    const mod = _require('../../src/config/index.js')
+    expect(mod.maxBodySize).toBe(1048576)
+    restore(s)
+  })
+
+  it('falls back to default maxBodySize when env var is less than 1', () => {
+    const s = save('MAX_BODY_SIZE')
+    process.env.MAX_BODY_SIZE = '0'
+    clearCjs('../../src/config/index.js', '../../src/config/load-env.js')
+    const mod = _require('../../src/config/index.js')
+    expect(mod.maxBodySize).toBe(1048576)
     restore(s)
   })
 })

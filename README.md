@@ -179,7 +179,7 @@ json-api-server/
 │       └── index.js              # HTTP server, routing, middleware, handlers
 ├── tests/
 │   ├── config/
-│   │   └── config.test.js           # Config defaults and env var branches (6)
+│   │   └── config.test.js           # Config defaults and env var branches (8)
 │   ├── db/
 │   │   ├── database.test.js         # Database CRUD, pagination, search, sort (5)
 │   │   ├── migrate.test.js          # Migration success and failure paths (2)
@@ -190,7 +190,7 @@ json-api-server/
 │   ├── redis/
 │   │   └── redis.test.js            # RESP protocol encoding/parsing, constructor options (25)
 │   ├── server/
-│   │   ├── coverage-printlog.test.js # V8 coverage: printLog, startServer, 500 catch (2)
+│   │   ├── coverage-printlog.test.js # V8 coverage: printLog, startServer, 500 catch (3)
 │   │   ├── integration.test.js      # API integration tests — real HTTP + SQLite (50)
 │   │   └── server.test.js           # Server request handler and startup paths (5)
 │   ├── README.md                    # Testing documentation
@@ -271,12 +271,12 @@ This runs comprehensive queries to inspect row counts, column metadata, relation
 
 ## Testing
 
-Uses **vitest** with **V8 native coverage**. 111 tests across 10 test files cover the full stack — from integration tests (real HTTP server + SQLite) to unit tests for every module.
+Uses **vitest** with **V8 native coverage**. **114 tests across 10 test files** cover the full stack — from integration tests (real HTTP server + SQLite) to unit tests for every module.
 
 ```bash
 npm test              # Run all tests once
 npm run test:watch    # Watch mode
-npm run test:coverage # With coverage report (~92% statements, ~89% branches)
+npm run test:coverage # With coverage report (~98% statements, ~98% branches)
 ```
 
 See [tests/README.md](tests/README.md) for full documentation.

@@ -1,12 +1,7 @@
-import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest'
-import fs from 'fs'
-import path from 'path'
-import { mkdtempSync } from 'fs'
-import { tmpdir } from 'os'
+import { describe, it, expect, vi } from 'vitest'
 import { createRequire } from 'module'
-import { save, restore, setEnv, configMockFactory } from '../helpers/coverage'
+import { save, restore, setEnv } from '../helpers/coverage'
 
-const tmpDir = mkdtempSync(path.join(tmpdir(), 'cov-rl-'))
 const _require = createRequire(import.meta.url)
 function clearCjs(...keys) {
   for (const key of keys) {
@@ -15,26 +10,11 @@ function clearCjs(...keys) {
   }
 }
 
-afterAll(() => {
-  try { fs.rmSync(tmpDir, { recursive: true, force: true }) } catch {}
-})
-
-vi.mock('../../src/config/load-env.js', () => ({ loadEnv: () => {} }))
-vi.mock('../../src/config/index.js', () => configMockFactory())
-
 describe('rate-limiter.js', () => {
-  let createRateLimiter
-
-  beforeAll(async () => {
-    clearCjs('../../src/middleware/rate-limiter.js', '../../src/config/index.js')
-    const mod = await import('../../src/middleware/rate-limiter.js')
-    createRateLimiter = mod.createRateLimiter
-  })
-
   function freshLimiter(redis, envOverrides = {}) {
-    clearCjs('../../src/config/index.js')
+    clearCjs('../../src/middleware/rate-limiter.js', '../../src/config/index.js')
     Object.entries(envOverrides).forEach(([k, v]) => { process.env[k] = v })
-    return createRateLimiter(redis)
+    return _require('../../src/middleware/rate-limiter.js').createRateLimiter(redis)
   }
 
   it('rate limits via in-memory store and blocks at limit', async () => {
@@ -129,8 +109,7 @@ describe('rate-limiter.js', () => {
     const s = save('RATE_LIMIT_ENABLED', 'RATE_LIMIT_MAX', 'RATE_LIMIT_WINDOW_MS')
     setEnv({ RATE_LIMIT_ENABLED: 'true', RATE_LIMIT_MAX: '2', 'RATE_LIMIT_WINDOW_MS': '60000' })
     clearCjs('../../src/middleware/rate-limiter.js', '../../src/config/index.js')
-    const { createRateLimiter } = await import('../../src/middleware/rate-limiter.js')
-    const limiter = createRateLimiter(null)
+    const limiter = _require('../../src/middleware/rate-limiter.js').createRateLimiter(null)
     const req = { headers: {}, socket: { remoteAddress: '7.7.7.7' } }
     const res1 = { setHeader: vi.fn(), writeHead: vi.fn(), end: vi.fn() }
     const res2 = { setHeader: vi.fn(), writeHead: vi.fn(), end: vi.fn() }

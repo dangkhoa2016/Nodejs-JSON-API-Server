@@ -21,7 +21,6 @@ afterAll(() => {
   try { fs.rmSync(tmpDir, { recursive: true, force: true }) } catch {}
 })
 
-vi.mock('../../src/config/load-env.js', () => ({ loadEnv: () => {} }))
 vi.mock('../../src/config/index.js', () => configMockFactory())
 
 describe('seed.js', () => {

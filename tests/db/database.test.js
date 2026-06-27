@@ -19,15 +19,14 @@ afterAll(() => {
   try { fs.rmSync(tmpDir, { recursive: true, force: true }) } catch {}
 })
 
-vi.mock('../../src/config/load-env.js', () => ({ loadEnv: () => {} }))
 vi.mock('../../src/config/index.js', () => configMockFactory())
 
 describe('database.js', () => {
-  it('covers getWrappedDb with DEBUG_SQL enabled', async () => {
+  it('covers getWrappedDb with DEBUG_SQL enabled', () => {
     const s = save('DEBUG_SQL', 'DB_PATH')
     setEnv({ DEBUG_SQL: 'true', DB_PATH: path.join(tmpDir, 'db1.db') })
-    vi.resetModules()
-    const mod = await import('../../src/db/index.js')
+    clearCjs('../../src/db/index.js', '../../src/config/index.js')
+    const mod = _require('../../src/db/index.js')
     const w = mod.getWrappedDb()
     expect(w).toBeDefined()
     const w2 = mod.getWrappedDb()
@@ -35,34 +34,32 @@ describe('database.js', () => {
     restore(s)
   })
 
-  it('covers getDb when db is already initialized', async () => {
+  it('covers getDb when db is already initialized', () => {
     const s = save('DB_PATH')
     process.env.DB_PATH = path.join(tmpDir, 'db2.db')
-    vi.resetModules()
-    const mod = await import('../../src/db/index.js')
+    clearCjs('../../src/db/index.js', '../../src/config/index.js')
+    const mod = _require('../../src/db/index.js')
     const first = mod.getDb()
     const second = mod.getDb()
     expect(first).toBe(second)
     restore(s)
   })
 
-  it('covers getWrappedDb without DEBUG_SQL', async () => {
+  it('covers getWrappedDb without DEBUG_SQL', () => {
     const s = save('DEBUG_SQL', 'DB_PATH')
     setEnv({ DEBUG_SQL: 'false', DB_PATH: path.join(tmpDir, 'db3.db') })
     clearCjs('../../src/db/index.js', '../../src/config/index.js')
-    vi.resetModules()
-    const mod = await import('../../src/db/index.js')
+    const mod = _require('../../src/db/index.js')
     expect(mod.getWrappedDb()).toBe(mod.getDb())
     restore(s)
   })
 
-  it('covers parseRow, buildWhere, listAll, and getOne', async () => {
+  it('covers parseRow, buildWhere, listAll, and getOne', () => {
     const dbPath = path.join(tmpDir, 'db-crud.db')
     const s = save('DB_PATH', 'DEBUG_SQL')
     setEnv({ DB_PATH: dbPath, DEBUG_SQL: 'true' })
     clearCjs('../../src/db/index.js', '../../src/config/index.js')
-    vi.resetModules()
-    const mod = await import('../../src/db/index.js')
+    const mod = _require('../../src/db/index.js')
     const db = mod.getDb()
     db.exec(`
       CREATE TABLE users (
@@ -109,13 +106,12 @@ describe('database.js', () => {
     restore(s)
   })
 
-  it('covers insertOne, updateOne, deleteOne, and nextId', async () => {
+  it('covers insertOne, updateOne, deleteOne, and nextId', () => {
     const dbPath = path.join(tmpDir, 'db-write.db')
     const s = save('DB_PATH', 'DEBUG_SQL')
     setEnv({ DB_PATH: dbPath, DEBUG_SQL: 'false' })
     clearCjs('../../src/db/index.js', '../../src/config/index.js')
-    vi.resetModules()
-    const mod = await import('../../src/db/index.js')
+    const mod = _require('../../src/db/index.js')
     const db = mod.getDb()
     db.exec(`
       CREATE TABLE users (
@@ -152,6 +148,7 @@ describe('database.js', () => {
     expect(mod.nextId('users')).toBe(6)
 
     mod.insertOne('todos', { id: 1, userId: 1, title: 'Initial', completed: true })
+    mod.insertOne('todos', { id: 2, userId: 1, title: 'Another', completed: false })
     expect(mod.updateOne('users', 999, { name: 'Missing' }, false)).toBeNull()
     const replaced = mod.updateOne('users', 5, {
       name: 'Carol Updated',
