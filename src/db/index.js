@@ -1,7 +1,7 @@
 'use strict';
 
 const { DatabaseSync } = require('node:sqlite');
-const { dbPath, dbDebugSql } = require('../config');
+const { dbPath, dbDebugSql, defaultPageSize } = require('../config');
 const { wrapDb } = require('./sql-logger');
 
 let db;
@@ -49,27 +49,83 @@ const FILTER_COLS = {
   todos: ['id', 'userId', 'title', 'completed'],
 };
 
-function buildWhere(table, query) {
+const SEARCH_COLS = {
+  users: ['name', 'username', 'email'],
+  posts: ['title', 'body'],
+  comments: ['name', 'email', 'body'],
+  albums: ['title'],
+  photos: ['title'],
+  todos: ['title'],
+};
+
+function buildWhere(table, query = {}) {
+  const filters = {};
+  let page, limit, start, end, sort, order, search;
+
+  for (const [k, v] of Object.entries(query)) {
+    switch (k) {
+      case '_page': page = parseInt(v, 10); break;
+      case '_limit': limit = parseInt(v, 10); break;
+      case '_start': start = parseInt(v, 10); break;
+      case '_end': end = parseInt(v, 10); break;
+      case '_sort': sort = v; break;
+      case '_order': order = v; break;
+      case 'q': search = v; break;
+      default: filters[k] = v; break;
+    }
+  }
+
   const cols = FILTER_COLS[table] || [];
   const clauses = [];
   const values = [];
 
-  for (const [k, v] of Object.entries(query)) {
-    if (cols.includes(k)) {
+  for (const [k, v] of Object.entries(filters)) {
+    const isKnownCol = cols.includes(k);
+    if (isKnownCol) {
       clauses.push(`${k} = ?`);
       values.push(k === 'completed' ? (v === 'true' ? 1 : 0) : v);
     }
   }
-  return {
-    where: clauses.length ? ' WHERE ' + clauses.join(' AND ') : '',
-    values,
-  };
+
+  const searchCols = SEARCH_COLS[table] || [];
+  if (search && searchCols.length > 0) {
+    const escaped = search.replace(/[%_\\]/g, '\\$&');
+    const searchClauses = searchCols.map((c) => `${c} LIKE ? ESCAPE '\\'`);
+    const likeVal = `%${escaped}%`;
+    clauses.push(`(${searchClauses.join(' OR ')})`);
+    for (const _ of searchCols) values.push(likeVal);
+  }
+
+  const hasClauses = clauses.length > 0;
+  let sql = `SELECT * FROM ${table}`;
+  if (hasClauses) {
+    sql += ' WHERE ' + clauses.join(' AND ');
+  }
+
+  const allCols = [...new Set([...cols, ...searchCols])];
+  const safeSort = sort && allCols.includes(sort) ? sort : null;
+  if (safeSort) {
+    const dir = order && ['asc', 'desc'].includes(order.toLowerCase()) ? order.toUpperCase() : 'ASC';
+    sql += ` ORDER BY "${safeSort}" ${dir}`;
+  }
+  const hasPage = page !== undefined;
+  const hasLimit = limit !== undefined;
+  if (start !== undefined) {
+    const lim = end !== undefined ? end - start : -1;
+    sql += ` LIMIT ${lim} OFFSET ${start}`;
+  } else if (hasPage || hasLimit) {
+    const p = hasPage ? page : 1;
+    const lim = hasLimit ? limit : defaultPageSize;
+    sql += ` LIMIT ${lim} OFFSET ${(p - 1) * lim}`;
+  }
+
+  return { sql, values };
 }
 
 function listAll(table, query = {}) {
   const d = getWrappedDb();
-  const { where, values } = buildWhere(table, query);
-  const rows = d.prepare(`SELECT * FROM ${table}${where}`).all(...values);
+  const { sql, values } = buildWhere(table, query);
+  const rows = d.prepare(sql).all(...values);
   return rows.map((r) => parseRow(table, r));
 }
 
@@ -121,7 +177,8 @@ function deleteOne(table, id) {
 function nextId(table) {
   const d = getWrappedDb();
   const row = d.prepare(`SELECT MAX(id) as m FROM ${table}`).get();
-  return (row.m || 0) + 1;
+  const m = row.m ?? 0;
+  return m + 1;
 }
 
-module.exports = { getDb, getWrappedDb, listAll, getOne, insertOne, updateOne, deleteOne, nextId, TABLES };
+module.exports = { getDb, getWrappedDb, buildWhere, listAll, getOne, insertOne, updateOne, deleteOne, nextId, TABLES };

@@ -53,6 +53,7 @@ Environment files are loaded by `src/config/load-env.js` (auto-run via `src/conf
 | `RATE_LIMIT_WINDOW_MS` | `60000`     | Time window in milliseconds (default 1 min) |
 | `SEED_API_BASE_URL`    | `https://jsonplaceholder.typicode.com` | Base URL for seed data API |
 | `MAX_BODY_SIZE`        | `1048576`   | Max request body size in bytes (minimum 1) |
+| `DEFAULT_PAGE_SIZE`   | `10`        | Default number of results per page for `_page`/`_limit` pagination |
 
 ---
 
@@ -80,7 +81,7 @@ Environment files are loaded by `src/config/load-env.js` (auto-run via `src/conf
 | `PATCH`  | `/api/:table/:id`           | Partial update               |
 | `DELETE` | `/api/:table/:id`           | Delete resource              |
 
-### Query String Filtering
+### Query String Filtering & Pagination
 
 ```bash
 # Filter posts by userId
@@ -94,6 +95,57 @@ GET /api/comments?postId=1
 ```
 
 Filterable columns vary by table (e.g., `title`, `email`, `username`). The `completed` field accepts `true`/`false` strings.
+
+### Pagination
+
+| Param     | Description                                    | Example                      |
+|-----------|------------------------------------------------|------------------------------|
+| `_page`   | Page number (1-based), used with `_limit`      | `?_page=1&_limit=10`        |
+| `_limit`  | Items per page (default: `DEFAULT_PAGE_SIZE`)  | `?_page=2&_limit=5`         |
+| `_start`  | Offset index for slicing                       | `?_start=10&_end=20`        |
+| `_end`    | End index (exclusive) for slicing              | `?_start=0&_end=5`          |
+
+### Search
+
+Search across text columns using the `q` parameter. Searchable columns vary by table:
+
+| Table      | Searchable columns                        |
+|------------|-------------------------------------------|
+| `users`    | `name`, `username`, `email`               |
+| `posts`    | `title`, `body`                           |
+| `comments` | `name`, `email`, `body`                   |
+| `albums`   | `title`                                   |
+| `photos`   | `title`                                   |
+| `todos`    | `title`                                   |
+
+```bash
+# Search posts by title or body
+GET /api/posts?q=first
+
+# Combine search with filter
+GET /api/posts?q=Post&userId=1
+
+# Search todos
+GET /api/todos?q=groceries
+```
+
+### Sorting
+
+| Param    | Values         | Description                          |
+|----------|----------------|--------------------------------------|
+| `_sort`  | column name    | Column to sort by                    |
+| `_order` | `asc` / `desc` | Sort direction (default: `asc`)      |
+
+```bash
+# Sort posts by title ascending
+GET /api/posts?_sort=title&_order=asc
+
+# Sort posts by title descending
+GET /api/posts?_sort=title&_order=desc
+
+# Combine sort with pagination
+GET /api/posts?_sort=id&_order=desc&_limit=2
+```
 
 ### System Endpoints
 
@@ -182,7 +234,7 @@ json-api-server/
 │   │   ├── config.test.js           # Config defaults and env var branches (8)
 │   │   └── load-env.test.js         # Load-env file loading chain and error paths (7)
 │   ├── db/
-│   │   ├── database.test.js         # Database CRUD, pagination, search, sort (5)
+│   │   ├── database.test.js         # Database CRUD, pagination, search, sort, SQL injection (9)
 │   │   ├── migrate.test.js          # Migration success and failure paths (2)
 │   │   ├── seed.test.js             # Seed with real DB + mocked deps, JSONPlaceholder fetch (5)
 │   │   └── sql-logger.test.js       # SQL query logger wrapping (5)
@@ -192,7 +244,7 @@ json-api-server/
 │   │   └── redis.test.js            # RESP protocol encoding/parsing, constructor options (25)
 │   ├── server/
 │   │   ├── coverage-printlog.test.js # V8 coverage: printLog, startServer, 500 catch (3)
-│   │   ├── integration.test.js      # API integration tests — real HTTP + SQLite (50)
+│   │   ├── integration.test.js      # API integration tests — real HTTP + SQLite (62)
 │   │   └── server.test.js           # Server request handler and startup paths (5)
 │   ├── README.md                    # Testing documentation
 │   └── helpers/
@@ -272,7 +324,7 @@ This runs comprehensive queries to inspect row counts, column metadata, relation
 
 ## Testing
 
-Uses **vitest** with **V8 native coverage**. **121 tests across 11 test files** cover the full stack — from integration tests (real HTTP server + SQLite) to unit tests for every module.
+Uses **vitest** with **V8 native coverage**. **142 tests across 11 test files** cover the full stack — from integration tests (real HTTP server + SQLite) to unit tests for every module.
 
 ```bash
 npm test              # Run all tests once
@@ -290,11 +342,9 @@ See [tests/README.md](tests/README.md) for full documentation.
 - **Centralized config** — all environment variables are read in `src/config/index.js` and exported as camelCase (`port`, `dbPath`, `redisOpts`, `rateLimitMax`, `dbDebugSql`, etc.) for use across the codebase.
 - **Lazy rate-limiter config** — `src/middleware/rate-limiter.js` reads config inside `createRateLimiter()` (not at module level), allowing different config values per call and making unit testing straightforward.
 - **Testable seed script** — `src/db/seed.js` accepts `database` and `fetch` parameters via dependency injection, enabling full unit testing without mocking `require()`.
-<<<<<<< HEAD
-- **SQL query logging** — `src/sql-logger.js` exports `wrapDb`/`wrapStmt` Proxy wrappers that log `exec`, `prepare`, `run`, `get`, and `all` calls to stderr. `src/database.js` uses them via `getWrappedDb()` when `DEBUG_SQL=true`.
-- **Multi-environment** — `src/config.js` requires `src/load-env.js` at module level, which auto-loads dotenv using a priority chain based on `NODE_ENV`. Every consumer (server, migrate, seed) simply requires `config.js` and gets correct env values. In production, dotenv is skipped entirely — env vars must come from the deployment environment.
+- **SQL query logging** — `src/db/sql-logger.js` exports `wrapDb`/`wrapStmt` Proxy wrappers that log `exec`, `prepare`, `run`, `get`, and `all` calls to stderr. `src/db/index.js` uses them via `getWrappedDb()` when `DEBUG_SQL=true`.
 - **Multi-environment** — `src/config/index.js` requires `src/config/load-env.js` at module level, which chain-loads all dotenv files in priority order with `override: false` — existing `process.env` values and earlier files take precedence over later ones. Every consumer (server, migrate, seed) simply requires `src/config/index.js` and gets correct env values. In production, dotenv is skipped entirely — env vars must come from the deployment environment.
->>>>>>> 9a2a6ab (refactor: reorganize src/ into feature subdirectories)
+- **SQL injection prevention** — `src/db/index.js` validates `_sort` against a whitelist of known columns and quotes identifiers with `""`; LIKE wildcards (`%`, `_`) are escaped to prevent injection through the `q` parameter
 - **CORS** enabled on all routes
 - **Graceful shutdown** — handles `SIGINT` and `SIGTERM` to close the server and Redis connection cleanly
 

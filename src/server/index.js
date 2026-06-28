@@ -59,13 +59,25 @@ function readBody(req, res) {
     });
     req.on('end', () => {
       try {
-        resolve(body ? JSON.parse(body) : {});
+        let parsed = body ? JSON.parse(body) : {};
+        /* v8 ignore next 2 — defensive: JSON.parse can return null */
+        if (parsed === null) parsed = {};
+        resolve(parsed);
       } catch (_) {
         reject(new Error('Invalid JSON'));
       }
     });
     req.on('error', reject);
   });
+}
+
+async function readBodySafe(req, res) {
+  try {
+    return await readBody(req, res);
+  } catch (e) {
+    if (e !== BODY_TOO_LARGE) badRequest(res, 'Invalid JSON body');
+  }
+  return null;
 }
 
 function parseRoute(pathname) {
@@ -78,7 +90,7 @@ function parseRoute(pathname) {
 
   if (!db.TABLES.includes(table)) return null;
   /* v8 ignore next */
-  if (rawId && isNaN(id)) return null;
+  if (rawId && isNaN(id)) return { invalidId: true };
 
   return { table, id, sub };
 }
@@ -91,6 +103,22 @@ const NESTED = {
 
 async function handleGET(req, res, route, query) {
   const { table, id, sub } = route;
+
+  for (const param of ['_page', '_limit', '_start', '_end']) {
+    if (query[param] !== undefined) {
+      if (query[param] === '') {
+        delete query[param];
+      } else {
+        const val = Number(query[param]);
+        if (!Number.isInteger(val) || val < 0) {
+          return badRequest(res, `Invalid ${param}: must be a non-negative integer`);
+        }
+        if ((param === '_page' || param === '_limit') && val < 1) {
+          return badRequest(res, `Invalid ${param}: must be a positive integer`);
+        }
+      }
+    }
+  }
 
   if (id !== null && sub) {
     const parentExists = db.getOne(table, id);
@@ -115,9 +143,8 @@ async function handleGET(req, res, route, query) {
 
 async function handlePOST(req, res, route) {
   const { table } = route;
-  let body;
-  try { body = await readBody(req, res); }
-  catch (e) { if (e !== BODY_TOO_LARGE) return badRequest(res, 'Invalid JSON body'); return json(res, 413, { error: 'Request body too large' }); }
+  const body = await readBodySafe(req, res);
+  if (body === null) return;
 
   if (!body.id) body.id = db.nextId(table);
 
@@ -133,9 +160,8 @@ async function handlePUT(req, res, route) {
   const { table, id } = route;
   if (id === null) return badRequest(res, 'PUT requires an id');
 
-  let body;
-  try { body = await readBody(req, res); }
-  catch (e) { if (e !== BODY_TOO_LARGE) return badRequest(res, 'Invalid JSON body'); return json(res, 413, { error: 'Request body too large' }); }
+  const body = await readBodySafe(req, res);
+  if (body === null) return;
 
   const updated = db.updateOne(table, id, body, true);
   updated ? json(res, 200, updated) : notFound(res);
@@ -145,9 +171,8 @@ async function handlePATCH(req, res, route) {
   const { table, id } = route;
   if (id === null) return badRequest(res, 'PATCH requires an id');
 
-  let body;
-  try { body = await readBody(req, res); }
-  catch (e) { if (e !== BODY_TOO_LARGE) return badRequest(res, 'Invalid JSON body'); return json(res, 413, { error: 'Request body too large' }); }
+  const body = await readBodySafe(req, res);
+  if (body === null) return;
 
   const updated = db.updateOne(table, id, body, false);
   updated ? json(res, 200, updated) : notFound(res);
@@ -211,6 +236,7 @@ async function requestHandler(req, res) {
 
   const route = parseRoute(pathname);
   if (!route) return notFound(res, `Unknown route: ${pathname}`);
+  if (route.invalidId) return badRequest(res, 'Invalid ID format');
 
   try {
     switch (method) {

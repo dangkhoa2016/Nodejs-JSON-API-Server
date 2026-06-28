@@ -21,7 +21,7 @@ tests/
     config.test.js                   # Config defaults and env var branches (8 tests)
     load-env.test.js                 # Load-env file loading chain and error paths (7 tests)
   db/
-    database.test.js                 # Database CRUD, pagination, search, sort (5 tests)
+    database.test.js                 # Database CRUD, pagination, search, sort, SQL injection (10 tests)
     migrate.test.js                  # Migration success and failure paths (2 tests)
     seed.test.js                     # Seed with real DB + mocked deps, JSONPlaceholder fetch (5 tests)
     sql-logger.test.js               # SQL query logger wrapping tests (5 tests)
@@ -31,7 +31,7 @@ tests/
     redis.test.js                    # RESP protocol encoding/parsing, constructor options (25 tests)
   server/
     coverage-printlog.test.js        # V8 coverage: printLog, startServer, 500 catch (3 tests)
-    integration.test.js              # API integration tests — real HTTP + SQLite (50 tests)
+    integration.test.js              # API integration tests — real HTTP + SQLite (67 tests)
     server.test.js                   # Server request handler and startup paths (5 tests)
   helpers/
     coverage.js                      # Shared test utilities (save/restore/setEnv/clearCjs)
@@ -39,13 +39,13 @@ tests/
     seed.js                          # Standalone script to create & seed temp DB
 ```
 
-**Total: 121 tests across 11 test files.**
+**Total: 143 tests across 11 test files.**
 
 ## Test design
 
 ### Integration tests (`tests/server/integration.test.js`)
 
-Each run creates an isolated temp SQLite database, seeds it with test data via a child process (`helpers/seed.js`), then starts the server on port 3199. Tests make real HTTP requests and validate the full request lifecycle. Rate limiting is disabled via `RATE_LIMIT_ENABLED=false` in the test helper. The temp directory is cleaned up after all tests finish.
+Each run creates an isolated temp SQLite database, seeds it with test data via a child process (`helpers/seed.js`), then starts the server on port 3199. Tests make real HTTP requests and validate the full request lifecycle — including pagination (`_page`/`_limit`/`_start`/`_end`), search (`q`), sorting (`_sort`/`_order`), and CRUD operations. Rate limiting is disabled via `RATE_LIMIT_ENABLED=false` in the test helper. The temp directory is cleaned up after all tests finish.
 
 ### Unit tests (`tests/config/`, `tests/db/`, `tests/middleware/`, `tests/redis/`, `tests/server/`)
 

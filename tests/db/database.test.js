@@ -103,6 +103,25 @@ describe('database.js', () => {
     expect(pending).toHaveLength(1)
     expect(pending[0].completed).toBe(false)
     expect(mod.getOne('users', 999)).toBeNull()
+
+    const startEnd = mod.listAll('users', { _start: '0', _end: '2' })
+    expect(startEnd).toHaveLength(2)
+    expect(startEnd[0].id).toBe(1)
+    expect(startEnd[1].id).toBe(2)
+
+    const pageLimit = mod.listAll('users', { _page: '1', _limit: '1' })
+    expect(pageLimit).toHaveLength(1)
+    expect(pageLimit[0].id).toBe(1)
+
+    db.exec('CREATE TABLE extras (id INTEGER PRIMARY KEY, label TEXT)')
+    db.prepare('INSERT INTO extras (id, label) VALUES (?, ?)').run(1, 'Hello')
+    const unknown = mod.listAll('extras', { label: 'Hello' })
+    expect(unknown).toHaveLength(1)
+    expect(unknown[0].id).toBe(1)
+
+    const searchIgnored = mod.listAll('extras', { q: 'Hello' })
+    expect(searchIgnored).toHaveLength(1)
+
     restore(s)
   })
 
@@ -165,6 +184,152 @@ describe('database.js', () => {
     expect(patchedTodo.userId).toBe(1)
     expect(mod.deleteOne('todos', 999)).toBeNull()
     expect(mod.deleteOne('todos', 1).id).toBe(1)
+    restore(s)
+  })
+
+  it('covers listAll params via direct require for V8 coverage accuracy', () => {
+    const dbPath = path.join(tmpDir, 'db-params.db')
+    const s = save('DB_PATH', 'DEBUG_SQL')
+    process.env.DB_PATH = dbPath
+    process.env.DEBUG_SQL = 'false'
+    clearCjs('../../src/db/index.js', '../../src/config/index.js')
+    const mod = _require('../../src/db/index.js')
+    const db = mod.getDb()
+    db.exec('CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT, email TEXT, username TEXT, phone TEXT, website TEXT)')
+    db.prepare('INSERT INTO users (id, name, email, username, phone, website) VALUES (?, ?, ?, ?, ?, ?)').run(1, 'Alice', 'alice@test.com', 'alice', '123', 'alice.dev')
+    db.prepare('INSERT INTO users (id, name, email, username, phone, website) VALUES (?, ?, ?, ?, ?, ?)').run(2, 'Bob', 'bob@test.com', 'bob', '456', 'bob.dev')
+    db.prepare('INSERT INTO users (id, name, email, username, phone, website) VALUES (?, ?, ?, ?, ?, ?)').run(3, 'Charlie', 'charlie@test.com', 'charlie', '789', 'charlie.dev')
+    db.exec('CREATE TABLE todos (id INTEGER PRIMARY KEY, userId INTEGER, title TEXT, completed INTEGER)')
+    db.prepare('INSERT INTO todos (id, userId, title, completed) VALUES (?, ?, ?, ?)').run(1, 1, 'Done', 1)
+    db.prepare('INSERT INTO todos (id, userId, title, completed) VALUES (?, ?, ?, ?)').run(2, 1, 'Todo', 0)
+    db.exec('CREATE TABLE extras (id INTEGER PRIMARY KEY, label TEXT)')
+    db.prepare('INSERT INTO extras (id, label) VALUES (?, ?)').run(1, 'Hello')
+
+    expect(mod.listAll('users', { name: 'Alice', ignored: 'value' })).toHaveLength(1)
+    expect(mod.listAll('users', { _start: '0', _end: '2' })).toHaveLength(2)
+    expect(mod.listAll('users', { _start: '0' })).toHaveLength(3)
+    expect(mod.listAll('users', { _page: '1', _limit: '2' })).toHaveLength(2)
+    expect(mod.listAll('users', { _page: '1' })).toHaveLength(3)
+    expect(mod.listAll('users', { _limit: '2' })).toHaveLength(2)
+    expect(mod.listAll('users', { _sort: 'name', _order: 'desc' })).toHaveLength(3)
+    expect(mod.listAll('users', { _sort: 'name', _order: 'asc' })).toHaveLength(3)
+    expect(mod.listAll('users', { _sort: 'name' })).toHaveLength(3)
+    expect(mod.listAll('users', { _sort: 'nonexistent' })).toHaveLength(3)
+    expect(mod.listAll('users', { q: 'Alice' })).toHaveLength(1)
+    expect(mod.listAll('todos', { completed: 'true' })).toHaveLength(1)
+    expect(mod.listAll('todos', { completed: 'false' })).toHaveLength(1)
+    expect(mod.listAll('extras', { label: 'Hello' })).toHaveLength(1)
+    expect(mod.listAll('extras', { q: 'Hello' })).toHaveLength(1)
+
+    restore(s)
+  })
+
+  it('escapes LIKE wildcards to prevent SQL injection', () => {
+    const dbPath = path.join(tmpDir, 'db-like.db')
+    const s = save('DB_PATH', 'DEBUG_SQL')
+    setEnv({ DB_PATH: dbPath, DEBUG_SQL: 'true' })
+    clearCjs('../../src/db/index.js', '../../src/config/index.js')
+    const mod = _require('../../src/db/index.js')
+    const db = mod.getDb()
+    db.exec('CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT, username TEXT, email TEXT)')
+    db.prepare('INSERT INTO users (id, name, username, email) VALUES (?, ?, ?, ?)').run(1, 'task_99%_done', 'userA', 'a@b.com')
+    db.prepare('INSERT INTO users (id, name, username, email) VALUES (?, ?, ?, ?)').run(2, 'normal_task', 'userB', 'c@d.com')
+    db.prepare('INSERT INTO users (id, name, username, email) VALUES (?, ?, ?, ?)').run(3, 'plain', 'userC', 'e@f.com')
+
+    const literalPercent = mod.listAll('users', { q: '99%' })
+    expect(literalPercent).toHaveLength(1)
+    expect(literalPercent[0].name).toBe('task_99%_done')
+
+    const literalUs = mod.listAll('users', { q: 'task_' })
+    expect(literalUs).toHaveLength(1)
+    expect(literalUs[0].name).toBe('task_99%_done')
+
+    const normalSearch = mod.listAll('users', { q: 'normal' })
+    expect(normalSearch).toHaveLength(1)
+    expect(normalSearch[0].name).toBe('normal_task')
+
+    restore(s)
+  })
+
+  it('rejects invalid ORDER BY values and quotes identifiers', () => {
+    const dbPath = path.join(tmpDir, 'db-sort.db')
+    const s = save('DB_PATH', 'DEBUG_SQL')
+    setEnv({ DB_PATH: dbPath, DEBUG_SQL: 'false' })
+    clearCjs('../../src/db/index.js', '../../src/config/index.js')
+    const mod = _require('../../src/db/index.js')
+    const db = mod.getDb()
+    db.exec('CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT, email TEXT)')
+    db.prepare('INSERT INTO users (id, name, email) VALUES (?, ?, ?)').run(1, 'Charlie', 'c@t.com')
+    db.prepare('INSERT INTO users (id, name, email) VALUES (?, ?, ?)').run(2, 'Alice', 'a@t.com')
+    db.prepare('INSERT INTO users (id, name, email) VALUES (?, ?, ?)').run(3, 'Bob', 'b@t.com')
+
+    const injection = mod.listAll('users', { _sort: 'name; DROP TABLE users--', _order: 'asc' })
+    expect(injection).toHaveLength(3)
+
+    const sorted = mod.listAll('users', { _sort: 'name', _order: 'asc' })
+    expect(sorted[0].name).toBe('Alice')
+    expect(sorted[1].name).toBe('Bob')
+    expect(sorted[2].name).toBe('Charlie')
+
+    const desc = mod.listAll('users', { _sort: 'name', _order: 'desc' })
+    expect(desc[0].name).toBe('Charlie')
+    expect(desc[2].name).toBe('Alice')
+
+    restore(s)
+  })
+
+  it('covers search via q parameter', () => {
+    const dbPath = path.join(tmpDir, 'db-search.db')
+    const s = save('DB_PATH', 'DEBUG_SQL')
+    setEnv({ DB_PATH: dbPath, DEBUG_SQL: 'true' })
+    clearCjs('../../src/db/index.js', '../../src/config/index.js')
+    const mod = _require('../../src/db/index.js')
+    const db = mod.getDb()
+    db.exec('CREATE TABLE todos (id INTEGER PRIMARY KEY, userId INTEGER, title TEXT, completed INTEGER)')
+    db.prepare('INSERT INTO todos (id, userId, title, completed) VALUES (?, ?, ?, ?)').run(1, 1, 'Buy milk', 0)
+    db.prepare('INSERT INTO todos (id, userId, title, completed) VALUES (?, ?, ?, ?)').run(2, 2, 'Buy eggs', 0)
+    db.prepare('INSERT INTO todos (id, userId, title, completed) VALUES (?, ?, ?, ?)').run(3, 1, 'Wash car', 1)
+
+    const results = mod.listAll('todos', { q: 'Buy', _sort: 'id', _order: 'asc' })
+    expect(results).toHaveLength(2)
+
+    const noResults = mod.listAll('todos', { q: 'Nonexistent' })
+    expect(noResults).toHaveLength(0)
+
+    restore(s)
+  })
+
+  it('buildWhere parses query params into SQL and values', () => {
+    const dbPath = path.join(tmpDir, 'db-buildwhere.db')
+    const s = save('DB_PATH', 'DEBUG_SQL')
+    setEnv({ DB_PATH: dbPath, DEBUG_SQL: 'false' })
+    clearCjs('../../src/db/index.js', '../../src/config/index.js')
+    const mod = _require('../../src/db/index.js')
+
+    const res1 = mod.buildWhere('users', { name: 'Alice', _page: '1', _limit: '10' })
+    expect(res1.sql).toMatch(/WHERE name = \?/)
+    expect(res1.sql).toMatch(/LIMIT 10 OFFSET 0/)
+    expect(res1.values).toEqual(['Alice'])
+
+    const res2 = mod.buildWhere('todos', { completed: 'true' })
+    expect(res2.values).toEqual([1])
+    expect(res2.sql).toMatch(/WHERE completed = \?/)
+
+    const res3 = mod.buildWhere('users', { q: 'test', _sort: 'name', _order: 'desc' })
+    expect(res3.sql).toContain('LIKE')
+    expect(res3.sql).toContain('ORDER BY')
+    expect(res3.sql).toContain('DESC')
+
+    const res4 = mod.buildWhere('users', {})
+    expect(res4.sql).toBe('SELECT * FROM users')
+    expect(res4.values).toEqual([])
+
+    const res5 = mod.buildWhere('users', { _start: '0', _end: '5' })
+    expect(res5.sql).toMatch(/LIMIT 5 OFFSET 0/)
+
+    const res6 = mod.buildWhere('nonexistent', { q: 'test' })
+    expect(res6.values).toEqual([])
+
     restore(s)
   })
 })

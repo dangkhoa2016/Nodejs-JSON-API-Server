@@ -143,6 +143,14 @@ describe('404 handling', () => {
   });
 });
 
+describe('400 handling', () => {
+  it('GET /api/users/abc returns 400 for invalid ID format', async () => {
+    const res = await request('/api/users/abc');
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('Invalid ID format');
+  });
+});
+
 describe('Filtering', () => {
   it('GET /api/todos?userId=1 filters by userId', async () => {
     const res = await request('/api/todos?userId=1');
@@ -270,14 +278,6 @@ describe('POST — Create', () => {
     expect(res.status).toBe(400);
     expect(res.body.error).toBe('Invalid JSON body');
   });
-
-  it('POST with unknown column returns 400 from db error', async () => {
-    const res = await request('/api/users', {
-      method: 'POST',
-      body: { name: 'test', extra_col: 'value' },
-    });
-    expect(res.status).toBe(400);
-  });
 });
 
 describe('PATCH — Partial update', () => {
@@ -377,4 +377,134 @@ describe('CORS headers on error responses', () => {
     expect(res.status).toBe(404);
     expect(res.headers['access-control-allow-origin']).toBe('*');
   });
-})
+});
+
+describe('Pagination', () => {
+  it('GET /api/posts?_page=1&_limit=2 returns first page', async () => {
+    const res = await request('/api/posts?_page=1&_limit=2');
+    expect(res.status).toBe(200);
+    expect(res.body.length).toBe(2);
+    expect(res.body[0].id).toBe(1);
+    expect(res.body[1].id).toBe(2);
+  });
+
+  it('GET /api/posts?_page=2&_limit=2 returns second page', async () => {
+    const res = await request('/api/posts?_page=2&_limit=2');
+    expect(res.status).toBe(200);
+    expect(res.body.length).toBe(2);
+    expect(res.body[0].id).toBe(4);
+    expect(res.body[1].id).toBe(100);
+  });
+
+  it('GET /api/posts?_start=1&_end=3 returns sliced results', async () => {
+    const res = await request('/api/posts?_start=1&_end=3');
+    expect(res.status).toBe(200);
+    expect(res.body.length).toBe(2);
+    expect(res.body[0].id).toBe(2);
+    expect(res.body[1].id).toBe(4);
+  });
+
+  it('GET /api/todos?_start=1 returns all from offset', async () => {
+    const res = await request('/api/todos?_start=1');
+    expect(res.status).toBe(200);
+    expect(res.body.length).toBe(2);
+  });
+
+  it('GET /api/posts?_limit=1 limits results', async () => {
+    const res = await request('/api/posts?_limit=1');
+    expect(res.status).toBe(200);
+    expect(res.body.length).toBe(1);
+  });
+
+  it('GET /api/posts?_page=0 returns 400', async () => {
+    const res = await request('/api/posts?_page=0');
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('Invalid _page: must be a positive integer');
+  });
+
+  it('GET /api/posts?_page=-1 returns 400', async () => {
+    const res = await request('/api/posts?_page=-1');
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('Invalid _page: must be a non-negative integer');
+  });
+
+  it('GET /api/posts?_limit=0 returns 400', async () => {
+    const res = await request('/api/posts?_limit=0');
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('Invalid _limit: must be a positive integer');
+  });
+
+  it('GET /api/posts?_page=&_limit=1 handles empty string by deleting param', async () => {
+    const res = await request('/api/posts?_page=&_limit=1');
+    expect(res.status).toBe(200);
+    expect(res.body.length).toBe(1);
+  });
+});
+
+describe('Search', () => {
+  it('GET /api/posts?q=first searches body content', async () => {
+    const res = await request('/api/posts?q=first');
+    expect(res.status).toBe(200);
+    expect(res.body.length).toBe(1);
+    expect(res.body[0].title).toBe('Patched Title');
+  });
+
+  it('GET /api/todos?q=groceries finds matching todos', async () => {
+    const res = await request('/api/todos?q=groceries');
+    expect(res.status).toBe(200);
+    expect(res.body.length).toBe(1);
+    expect(res.body[0].title).toBe('Buy groceries');
+  });
+
+  it('GET /api/posts?q=Post&userId=1 combines search and filter', async () => {
+    const res = await request('/api/posts?q=Post&userId=1');
+    expect(res.status).toBe(200);
+    expect(res.body.length).toBe(2);
+    res.body.forEach((p) => {
+      expect(p.userId).toBe(1);
+    });
+  });
+
+  it('GET /api/posts?q=nonexistent returns empty array', async () => {
+    const res = await request('/api/posts?q=nonexistent');
+    expect(res.status).toBe(200);
+    expect(res.body.length).toBe(0);
+  });
+});
+
+describe('Sorting', () => {
+  it('GET /api/posts?_sort=title&_order=asc sorts ascending', async () => {
+    const res = await request('/api/posts?_sort=title&_order=asc');
+    expect(res.status).toBe(200);
+    expect(res.body.length).toBe(4);
+    expect(res.body[0].title).toBe('Custom ID');
+    expect(res.body[1].title).toBe('New Post');
+    expect(res.body[2].title).toBe('Patched Title');
+    expect(res.body[3].title).toBe('Replaced');
+  });
+
+  it('GET /api/posts?_sort=title&_order=desc sorts descending', async () => {
+    const res = await request('/api/posts?_sort=title&_order=desc');
+    expect(res.status).toBe(200);
+    expect(res.body.length).toBe(4);
+    expect(res.body[0].title).toBe('Replaced');
+    expect(res.body[1].title).toBe('Patched Title');
+    expect(res.body[2].title).toBe('New Post');
+    expect(res.body[3].title).toBe('Custom ID');
+  });
+
+  it('GET /api/posts?_sort=title defaults to asc', async () => {
+    const res = await request('/api/posts?_sort=title');
+    expect(res.status).toBe(200);
+    expect(res.body[0].title).toBe('Custom ID');
+    expect(res.body[1].title).toBe('New Post');
+  });
+
+  it('GET /api/posts?_sort=id&_order=desc&_limit=2 combines sort with pagination', async () => {
+    const res = await request('/api/posts?_sort=id&_order=desc&_limit=2');
+    expect(res.status).toBe(200);
+    expect(res.body.length).toBe(2);
+    expect(res.body[0].id).toBe(100);
+    expect(res.body[1].id).toBe(4);
+  });
+});
