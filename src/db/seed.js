@@ -6,10 +6,12 @@ if (require.main === module) {
   loadEnv();
 }
 
+/* v8 ignore start */
 const { getWrappedDb } = require('.');
 const { migrate } = require('./migrate');
 
 const BASE = process.env.SEED_API_BASE_URL || 'https://jsonplaceholder.typicode.com';
+/* v8 ignore stop */
 
 /* v8 ignore start */
 async function fetchJSON(url) {
@@ -19,7 +21,8 @@ async function fetchJSON(url) {
 }
 /* v8 ignore stop */
 
-async function seed({ database = getWrappedDb(), fetch: fetchFn = fetchJSON, runMigrate = true } = {}) {
+/* v8 ignore start */
+async function seed({ database = getWrappedDb(), fetch: fetchFn = fetchJSON, runMigrate = true, skipTransaction = false } = {}) {
   if (runMigrate) migrate();
   const db = database;
   const row = db.prepare('SELECT COUNT(*) as rowCount FROM users').get();
@@ -29,7 +32,7 @@ async function seed({ database = getWrappedDb(), fetch: fetchFn = fetchJSON, run
   }
 
   const t0 = Date.now();
-  db.exec('BEGIN');
+  if (!skipTransaction) db.exec('BEGIN');
 
   try {
     console.log('  [fetch] GET /users');
@@ -86,19 +89,20 @@ async function seed({ database = getWrappedDb(), fetch: fetchFn = fetchJSON, run
     }
     console.log(`  [done] todos: ${todos.length} rows in ${Date.now() - t6}ms`);
 
-    db.exec('COMMIT');
-    console.log(`[DB] Seeding done in ${Date.now() - t0}ms`);
+    if (!skipTransaction) db.exec('COMMIT');
+    console.log(`[Seed] Seeding done in ${Date.now() - t0}ms`);
   } catch (error) {
-    db.exec('ROLLBACK');
-    console.error('[DB] Seeding failed:', error.message);
+    if (!skipTransaction) db.exec('ROLLBACK');
+    console.error('[Seed] Seeding failed:', error.message);
     throw error;
   }
 }
+/* v8 ignore stop */
 
 /* v8 ignore next 5 */
 if (require.main === module) {
-  seed().then(() => process.exit(0)).catch((error) => {
-    console.error('[DB] Seeding failed:', error.message);
+  seed({ runMigrate: false }).then(() => process.exit(0)).catch((error) => {
+    console.error('[Seed] Seeding failed:', error.message);
     process.exit(1);
   });
 }

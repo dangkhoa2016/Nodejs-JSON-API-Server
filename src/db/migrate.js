@@ -64,8 +64,17 @@ function migrate() {
       completed INTEGER DEFAULT 0,
       FOREIGN KEY(userId) REFERENCES users(id)
     );
+
+    CREATE TABLE IF NOT EXISTS settings (
+      id          INTEGER PRIMARY KEY,
+      key         TEXT NOT NULL UNIQUE,
+      value       TEXT NOT NULL,
+      description TEXT DEFAULT '',
+      updated_at  TEXT DEFAULT ''
+    );
   `);
 
+    /* v8 ignore next 1 */
     console.log('[Migrate] Migration complete.');
   } catch (error) {
     console.error('[Migrate] Migration failed:', error.message);

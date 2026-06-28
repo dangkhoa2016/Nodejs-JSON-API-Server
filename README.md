@@ -217,11 +217,13 @@ json-api-server/
 ├── src/
 │   ├── config/
 │   │   ├── index.js              # Centralized config — auto-loads dotenv via load-env.js, exports camelCase
-│   │   └── load-env.js           # Shared dotenv loader — auto-run on require, skips in production
+│   │   ├── load-env.js           # Shared dotenv loader — auto-run on require, skips in production
+│   │   └── setting-defs.js       # Setting definitions for 14 env vars (NODE_ENV, PORT, ADMIN_KEY, etc.)
 │   ├── db/
 │   │   ├── index.js              # SQLite layer (node:sqlite) — CRUD operations (reads config)
 │   │   ├── migrate.js            # Table creation (standalone via npm run db:migrate)
 │   │   ├── seed.js               # Fetches seed data from JSONPlaceholder API, auto-runs migrate
+│   │   ├── seed-settings.js      # Seeds 14 env vars (NODE_ENV, PORT, ADMIN_KEY, etc.) into settings table
 │   │   └── sql-logger.js         # Shared Proxy wrappers — logs exec/prepare/run/get/all to stderr
 │   ├── middleware/
 │   │   └── rate-limiter.js       # Rate limiter (Redis or in-memory fallback)
@@ -244,13 +246,14 @@ json-api-server/
 │   │   └── redis.test.js            # RESP protocol encoding/parsing, constructor options (25)
 │   ├── server/
 │   │   ├── coverage-printlog.test.js # V8 coverage: printLog, startServer, 500 catch (3)
-│   │   ├── integration.test.js      # API integration tests — real HTTP + SQLite (62)
+│   │   ├── integration.test.js      # API integration tests — real HTTP + SQLite (63)
 │   │   └── server.test.js           # Server request handler and startup paths (5)
 │   ├── README.md                    # Testing documentation
 │   └── helpers/
 │       ├── coverage.js              # Test-coverage utilities (save/restore/setEnv/clearCjs)
 │       ├── index.js                 # startServer / stopServer / request utilities
 │       └── seed.js                  # Standalone script to create & seed temp DB
+│   └── seed-settings-coverage.test.js  # Seed-settings.js V8 coverage (2)
 ├── manual/
 │   ├── curl.sh                  # Quick curl commands
 │   └── inspect-queries.sql      # SQL queries for database inspection
@@ -291,7 +294,7 @@ HTTP Request → CORS headers → Rate limiter → Route parser → Handler → 
 
 ## Database
 
-- **6 tables:** `users`, `posts`, `comments`, `albums`, `photos`, `todos`
+- **7 tables:** `users`, `posts`, `comments`, `albums`, `photos`, `todos`, `settings`
 - **WAL mode** for better concurrent read performance
 - **Foreign keys** enforced via `PRAGMA foreign_keys=ON`
 - **Seed data** fetched from [JSONPlaceholder](https://jsonplaceholder.typicode.com) on first run:
@@ -301,6 +304,7 @@ HTTP Request → CORS headers → Rate limiter → Route parser → Handler → 
   - 100 albums
   - 5000 photos
   - 200 todos
+  - 13 settings (environment variables: `NODE_ENV`, `PORT`, `DB_PATH`, `DEBUG_SQL`, `REDIS_HOST`, `REDIS_PORT`, `REDIS_DB`, `REDIS_PASSWORD`, `REDIS_URL`, `RATE_LIMIT_ENABLED`, `RATE_LIMIT_MAX`, `RATE_LIMIT_WINDOW_MS`, `DEFAULT_PAGE_SIZE`)
 
 ### Helper Script
 
@@ -314,9 +318,10 @@ This runs comprehensive queries to inspect row counts, column metadata, relation
 
 | Script        | Command                   | Description                                           |
 |---------------|---------------------------|-------------------------------------------------------|
-| `db:migrate`  | `npm run db:migrate`      | Creates the 6 tables (dotenv loaded by config.js)      |
-| `db:seed`     | `npm run db:seed`         | Fetches seed data from [JSONPlaceholder](https://jsonplaceholder.typicode.com), auto-runs migrate |
-| `db:setup`    | `npm run db:setup`        | Runs `db:seed` (which internally calls migrate)       |
+| `db:migrate`  | `npm run db:migrate`      | Creates the 7 tables (dotenv loaded by config.js)      |
+| `db:seed`     | `npm run db:seed`         | Fetches seed data from [JSONPlaceholder](https://jsonplaceholder.typicode.com), auto-runs migrate + seed-settings |
+| `db:seed-settings` | `npm run db:seed-settings` | Seeds environment variables into `settings` table (dotenv loaded by config.js) |
+| `db:setup`    | `npm run db:setup`        | Runs `db:seed` + `db:seed-settings` (migrate + JSONPlaceholder + env settings) |
 | `test`        | `npm test`                | Run vitest integration tests                          |
 | `test:coverage` | `npm run test:coverage` | Run tests with V8 coverage report                    |
 
@@ -324,7 +329,7 @@ This runs comprehensive queries to inspect row counts, column metadata, relation
 
 ## Testing
 
-Uses **vitest** with **V8 native coverage**. **142 tests across 11 test files** cover the full stack — from integration tests (real HTTP server + SQLite) to unit tests for every module.
+Uses **vitest** with **V8 native coverage**. **145 tests across 12 test files** cover the full stack — from integration tests (real HTTP server + SQLite) to unit tests for every module.
 
 ```bash
 npm test              # Run all tests once

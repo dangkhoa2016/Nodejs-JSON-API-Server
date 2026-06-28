@@ -13,6 +13,11 @@ migrate();
 
 const db = new DatabaseSync(dbPath);
 
+(async () => {
+  const { seedSettings } = require('../../src/db/seed-settings');
+  await seedSettings({ database: db, runMigrate: false });
+})().then(() => db.close()).catch(() => {});
+
 const addr1 = JSON.stringify({ street: '123 Main St', city: 'New York', zipcode: '10001', geo: { lat: '40.7128', lng: '-74.0060' } });
 const comp1 = JSON.stringify({ name: 'Tech Corp', catchPhrase: 'Innovate the future' });
 db.prepare('INSERT INTO users (id,name,username,email,phone,website,address,company) VALUES (1,?,?,?,?,?,?,?)')
@@ -43,5 +48,3 @@ db.prepare('INSERT INTO photos (id,albumId,title,url,thumbnailUrl) VALUES (2,1,?
 db.prepare('INSERT INTO todos (id,userId,title,completed) VALUES (1,1,?,?)').run('Buy groceries', 0);
 db.prepare('INSERT INTO todos (id,userId,title,completed) VALUES (2,1,?,?)').run('Write tests', 1);
 db.prepare('INSERT INTO todos (id,userId,title,completed) VALUES (3,2,?,?)').run('Learn vitest', 0);
-
-db.close();

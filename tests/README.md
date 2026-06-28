@@ -37,9 +37,10 @@ tests/
     coverage.js                      # Shared test utilities (save/restore/setEnv/clearCjs)
     index.js                         # startServer / stopServer / request utilities
     seed.js                          # Standalone script to create & seed temp DB
+    seed-settings-coverage.test.js   # Seed-settings.js V8 coverage (2 tests)
 ```
 
-**Total: 143 tests across 11 test files.**
+**Total: 145 tests across 12 test files.**
 
 ## Test design
 
@@ -61,6 +62,7 @@ Unit tests cover every source module individually. Each module has its own test 
 | `server/index.js` (ESM)        | `tests/server/coverage-printlog.test.js` | Dynamic `import()` for V8-covered printLog, startServer, 500 catch |
 | `db/migrate.js`                | `tests/db/migrate.test.js`   | Real migration + corrupt DB failure path |
 | `db/seed.js`                   | `tests/db/seed.test.js`      | Dependency injection — `database` and `fetch` injected |
+| `db/seed-settings.js`          | `tests/seed-settings-coverage.test.js` | Real DB + mock DB paths (V8 coverage) |
 | `db/sql-logger.js`             | `tests/db/sql-logger.test.js`| Proxy wrapper behavior on exec/prepare/run/get/all |
 
 ### Key testing patterns

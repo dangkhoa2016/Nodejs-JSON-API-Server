@@ -25,7 +25,7 @@ vi.mock('../../src/config/index.js', () => configMockFactory())
 
 describe('seed.js', () => {
   afterEach(() => {
-    clearCjs('../../src/db/seed.js', '../../src/db/migrate.js', '../../src/db/index.js', '../../src/config/index.js')
+    clearCjs('../../src/db/seed.js', '../../src/db/migrate.js', '../../src/db/index.js')
   })
 
   it('imports and migrate runs, seed returns early when DB has data', async () => {

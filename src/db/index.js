@@ -38,7 +38,7 @@ function parseRow(table, row) {
   return r;
 }
 
-const TABLES = ['users', 'posts', 'comments', 'albums', 'photos', 'todos'];
+const TABLES = ['users', 'posts', 'comments', 'albums', 'photos', 'todos', 'settings'];
 
 const FILTER_COLS = {
   users: ['id', 'name', 'username', 'email', 'phone', 'website'],
@@ -47,6 +47,7 @@ const FILTER_COLS = {
   albums: ['id', 'userId', 'title'],
   photos: ['id', 'albumId', 'title', 'url', 'thumbnailUrl'],
   todos: ['id', 'userId', 'title', 'completed'],
+  settings: ['id', 'key', 'value', 'description'],
 };
 
 const SEARCH_COLS = {
@@ -56,6 +57,7 @@ const SEARCH_COLS = {
   albums: ['title'],
   photos: ['title'],
   todos: ['title'],
+  settings: ['key', 'value', 'description'],
 };
 
 function buildWhere(table, query = {}) {
