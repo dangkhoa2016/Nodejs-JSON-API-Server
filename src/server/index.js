@@ -291,8 +291,21 @@ function startServer() {
 }
 
 /* v8 ignore start */
-process.on('SIGINT', () => { server.close(); redis.quit().catch(() => { }); process.exit(0); });
-process.on('SIGTERM', () => { server.close(); redis.quit().catch(() => { }); process.exit(0); });
-/* v8 ignore stop */
+function closeServer() {
+  return new Promise((resolve) => {
+    server.close(resolve);
+  });
+}
+async function shutdown(signal) {
+  console.log(`\n[Server] ${signal} received — shutting down gracefully...`);
+  await closeServer();
+  try { await redis.quit(); } catch { /* ignore */ }
+  process.exit(0);
+}
+if (process.listenerCount('SIGINT') === 0) {
+  process.on('SIGINT', () => shutdown('SIGINT'));
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+}
 
-module.exports = { server, requestHandler, printLog };
+/* v8 ignore stop */
+module.exports = { server, requestHandler, printLog, closeServer };

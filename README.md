@@ -246,6 +246,7 @@ json-api-server/
 │   │   └── redis.test.js            # RESP protocol encoding/parsing, constructor options (25)
 │   ├── server/
 │   │   ├── coverage-printlog.test.js # V8 coverage: printLog, startServer, 500 catch (3)
+│   │   ├── graceful-shutdown.test.js # Graceful shutdown via SIGINT/SIGTERM (1)
 │   │   ├── integration.test.js      # API integration tests — real HTTP + SQLite (63)
 │   │   └── server.test.js           # Server request handler and startup paths (5)
 │   ├── README.md                    # Testing documentation
@@ -329,7 +330,7 @@ This runs comprehensive queries to inspect row counts, column metadata, relation
 
 ## Testing
 
-Uses **vitest** with **V8 native coverage**. **145 tests across 12 test files** cover the full stack — from integration tests (real HTTP server + SQLite) to unit tests for every module.
+Uses **vitest** with **V8 native coverage**. **146 tests across 13 test files** cover the full stack — from integration tests (real HTTP server + SQLite) to unit tests for every module.
 
 ```bash
 npm test              # Run all tests once

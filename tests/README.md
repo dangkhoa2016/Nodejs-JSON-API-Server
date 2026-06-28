@@ -31,6 +31,7 @@ tests/
     redis.test.js                    # RESP protocol encoding/parsing, constructor options (25 tests)
   server/
     coverage-printlog.test.js        # V8 coverage: printLog, startServer, 500 catch (3 tests)
+    graceful-shutdown.test.js        # SIGINT/SIGTERM handler coverage (1 test)
     integration.test.js              # API integration tests — real HTTP + SQLite (67 tests)
     server.test.js                   # Server request handler and startup paths (5 tests)
   helpers/
@@ -40,7 +41,7 @@ tests/
     seed-settings-coverage.test.js   # Seed-settings.js V8 coverage (2 tests)
 ```
 
-**Total: 145 tests across 12 test files.**
+**Total: 146 tests across 13 test files.**
 
 ## Test design
 
@@ -59,6 +60,7 @@ Unit tests cover every source module individually. Each module has its own test 
 | `middleware/rate-limiter.js`   | `tests/middleware/rate-limiter.test.js` | Module imported once; `createRateLimiter()` with different configs per test |
 | `redis/index.js`               | `tests/redis/redis.test.js`  | RESP encoding/parsing directly; constructor options |
 | `server/index.js`              | `tests/server/server.test.js` | `requestHandler()` with mock req/res; CJS cache injection for DB mock |
+| `server/index.js` (child)      | `tests/server/graceful-shutdown.test.js` | SIGINT/SIGTERM via child process (V8 coverage) |
 | `server/index.js` (ESM)        | `tests/server/coverage-printlog.test.js` | Dynamic `import()` for V8-covered printLog, startServer, 500 catch |
 | `db/migrate.js`                | `tests/db/migrate.test.js`   | Real migration + corrupt DB failure path |
 | `db/seed.js`                   | `tests/db/seed.test.js`      | Dependency injection — `database` and `fetch` injected |
