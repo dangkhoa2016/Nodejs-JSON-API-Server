@@ -1,6 +1,6 @@
 # json-api-server
 
-A JSONPlaceholder-compatible REST API built with **Node.js built-ins only** — zero runtime dependencies. Uses `node:sqlite` for storage and a custom Redis client implemented over the raw RESP protocol via TCP sockets.
+A JSONPlaceholder-compatible REST API built with **Node.js built-ins only** — minimal runtime dependencies. Uses `node:sqlite` for storage and a custom Redis client implemented over the raw RESP protocol via TCP sockets.
 
 ## Requirements
 
@@ -305,7 +305,7 @@ HTTP Request → CORS headers → Rate limiter → Route parser → Handler → 
   - 100 albums
   - 5000 photos
   - 200 todos
-  - 13 settings (environment variables: `NODE_ENV`, `PORT`, `DB_PATH`, `DEBUG_SQL`, `REDIS_HOST`, `REDIS_PORT`, `REDIS_DB`, `REDIS_PASSWORD`, `REDIS_URL`, `RATE_LIMIT_ENABLED`, `RATE_LIMIT_MAX`, `RATE_LIMIT_WINDOW_MS`, `DEFAULT_PAGE_SIZE`)
+  - 14 settings (environment variables: `NODE_ENV`, `PORT`, `DB_PATH`, `DEBUG_SQL`, `REDIS_HOST`, `REDIS_PORT`, `REDIS_DB`, `REDIS_PASSWORD`, `REDIS_URL`, `RATE_LIMIT_ENABLED`, `RATE_LIMIT_MAX`, `RATE_LIMIT_WINDOW_MS`, `DEFAULT_PAGE_SIZE`, `ADMIN_KEY`)
 
 ### Helper Script
 
@@ -343,7 +343,7 @@ See [tests/README.md](tests/README.md) for full documentation.
 
 ## Implementation Notes
 
-- **Zero runtime dependencies** — only Node.js built-in modules (`http`, `url`, `fs`, `path`, `net`, `node:sqlite`). `dotenv` is a dev dependency.
+- **Minimal runtime dependencies** — only Node.js built-in modules (`http`, `url`, `fs`, `path`, `net`, `node:sqlite`). `dotenv` is a dev dependency.
 - **Pure RESP protocol** — the Redis client in `src/redis/index.js` implements the Redis serialization protocol over raw TCP sockets without any third-party library. Supports `AUTH` password authentication and `REDIS_URL` connection strings.
 - **Centralized config** — all environment variables are read in `src/config/index.js` and exported as camelCase (`port`, `dbPath`, `redisOpts`, `rateLimitMax`, `dbDebugSql`, etc.) for use across the codebase.
 - **Lazy rate-limiter config** — `src/middleware/rate-limiter.js` reads config inside `createRateLimiter()` (not at module level), allowing different config values per call and making unit testing straightforward.

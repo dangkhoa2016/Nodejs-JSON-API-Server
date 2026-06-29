@@ -2,7 +2,7 @@
 
 const path = require('path');
 
-require('./load-env');
+require('./load-env').loadEnv();
 
 /* v8 ignore start — config defaults evaluated at load time, covered by integration tests */
 const PORT = parseInt(process.env.PORT || '3000', 10);
@@ -28,6 +28,7 @@ const RATE_LIMIT_MAX = parseInt(process.env.RATE_LIMIT_MAX || '100', 10);
 const RATE_LIMIT_WINDOW_MS = parseInt(process.env.RATE_LIMIT_WINDOW_MS || '60000', 10);
 const RATE_LIMIT_WINDOW_SEC = Math.ceil(RATE_LIMIT_WINDOW_MS / 1000);
 
+const ADMIN_KEY = process.env.ADMIN_KEY || '';
 const DEFAULT_MAX_BODY_SIZE = 1048576;
 const parsedMaxBodySize = parseInt(process.env.MAX_BODY_SIZE || String(DEFAULT_MAX_BODY_SIZE), 10);
 const MAX_BODY_SIZE = isNaN(parsedMaxBodySize) || parsedMaxBodySize < 1 ? DEFAULT_MAX_BODY_SIZE : parsedMaxBodySize;
@@ -45,4 +46,5 @@ module.exports = {
   rateLimitWindowSec: RATE_LIMIT_WINDOW_SEC,
   maxBodySize: MAX_BODY_SIZE,
   defaultPageSize: DEFAULT_PAGE_SIZE,
+  adminKey: ADMIN_KEY,
 };

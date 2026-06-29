@@ -15,6 +15,12 @@ function clearCjs(...keys) {
   }
 }
 
+function mockLoadEnv() {
+  clearCjs('../../src/config/index.js', '../../src/config/load-env.js')
+  const loadEnvResolved = _require.resolve('../../src/config/load-env.js')
+  _require.cache[loadEnvResolved] = { exports: { loadEnv: () => {} } }
+}
+
 afterAll(() => {
   try { fs.rmSync(tmpDir, { recursive: true, force: true }) } catch {}
 })
@@ -97,13 +103,14 @@ describe('config.js', () => {
   })
 
   it('covers branches in the real config module via CJS require', () => {
-    const s = save('PORT', 'DB_PATH', 'REDIS_URL', 'RATE_LIMIT_ENABLED', 'REDIS_HOST', 'REDIS_PORT', 'REDIS_DB', 'REDIS_PASSWORD', 'DEBUG_SQL', 'RATE_LIMIT_MAX', 'RATE_LIMIT_WINDOW_MS', 'MAX_BODY_SIZE')
+    const s = save('PORT', 'DB_PATH', 'REDIS_URL', 'RATE_LIMIT_ENABLED', 'REDIS_HOST', 'REDIS_PORT', 'REDIS_DB', 'REDIS_PASSWORD', 'DEBUG_SQL', 'RATE_LIMIT_MAX', 'RATE_LIMIT_WINDOW_MS', 'MAX_BODY_SIZE', 'ADMIN_KEY')
     process.env.PORT = '5000'
     process.env.REDIS_URL = 'redis://custom:6379'
     process.env.RATE_LIMIT_ENABLED = 'false'
     process.env.DB_PATH = '/custom/data.db'
     process.env.DEBUG_SQL = 'true'
     process.env.MAX_BODY_SIZE = '2097152'
+    process.env.ADMIN_KEY = 'admin-secret-key'
     clearCjs('../../src/config/index.js', '../../src/config/load-env.js')
     const mod = _require('../../src/config/index.js')
     expect(mod.port).toBe(5000)
@@ -112,6 +119,7 @@ describe('config.js', () => {
     expect(mod.dbDebugSql).toBe(true)
     expect(mod.dbPath).toBe('/custom/data.db')
     expect(mod.maxBodySize).toBe(2097152)
+    expect(mod.adminKey).toBe('admin-secret-key')
     restore(s)
   })
 
@@ -120,7 +128,7 @@ describe('config.js', () => {
     delete process.env.PORT
     delete process.env.RATE_LIMIT_ENABLED
     delete process.env.MAX_BODY_SIZE
-    clearCjs('../../src/config/index.js', '../../src/config/load-env.js')
+    mockLoadEnv()
     const mod = _require('../../src/config/index.js')
     expect(mod.port).toBe(3000)
     expect(mod.rateLimitEnabled).toBe(true)
