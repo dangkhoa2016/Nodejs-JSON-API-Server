@@ -330,7 +330,7 @@ This runs comprehensive queries to inspect row counts, column metadata, relation
 
 ## Testing
 
-Uses **vitest** with **V8 native coverage**. **146 tests across 13 test files** cover the full stack — from integration tests (real HTTP server + SQLite) to unit tests for every module.
+Uses **vitest** with **V8 native coverage**. **147 tests across 13 test files** cover the full stack — from integration tests (real HTTP server + SQLite) to unit tests for every module.
 
 ```bash
 npm test              # Run all tests once

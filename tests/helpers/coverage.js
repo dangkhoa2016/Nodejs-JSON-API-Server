@@ -1,4 +1,15 @@
 import { vi } from 'vitest'
+import { createRequire } from 'module'
+
+export function createClearCjs(importMetaUrl) {
+  const _require = createRequire(importMetaUrl)
+  return (...keys) => {
+    for (const key of keys) {
+      const resolved = _require.resolve(key)
+      if (_require.cache[resolved]) delete _require.cache[resolved]
+    }
+  }
+}
 
 export function save(...keys) {
   const saved = {}
@@ -18,7 +29,7 @@ export function setEnv(overrides) {
 }
 
 export function configMockFactory() {
-  const METHODS = ['port', 'dbPath', 'dbDebugSql', 'redisOpts', 'rateLimitEnabled', 'rateLimitMax', 'rateLimitWindowMs', 'rateLimitWindowSec']
+  const METHODS = ['port', 'dbPath', 'dbDebugSql', 'redisOpts', 'rateLimitEnabled', 'rateLimitMax', 'rateLimitWindowMs', 'rateLimitWindowSec', 'adminKey', 'maxBodySize', 'defaultPageSize']
   const cfg = {
     getPort: () => parseInt(process.env.PORT || '3000', 10),
     getDbPath: () => process.env.DB_PATH || process.cwd() + '/storage/data.db',
@@ -36,6 +47,12 @@ export function configMockFactory() {
     getRateLimitMax: () => parseInt(process.env.RATE_LIMIT_MAX || '100', 10),
     getRateLimitWindowMs: () => parseInt(process.env.RATE_LIMIT_WINDOW_MS || '60000', 10),
     getRateLimitWindowSec: () => Math.ceil(parseInt(process.env.RATE_LIMIT_WINDOW_MS || '60000', 10) / 1000),
+    getAdminKey: () => process.env.ADMIN_KEY || '',
+    getMaxBodySize: () => {
+      const raw = parseInt(process.env.MAX_BODY_SIZE || '1048576', 10)
+      return isNaN(raw) || raw < 1 ? 1048576 : raw
+    },
+    getDefaultPageSize: () => parseInt(process.env.DEFAULT_PAGE_SIZE || '10', 10),
   }
   const getMethod = (prop) => cfg['get' + prop[0].toUpperCase() + prop.slice(1)]
   return new Proxy(cfg, {

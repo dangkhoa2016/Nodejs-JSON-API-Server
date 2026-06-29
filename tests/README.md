@@ -18,7 +18,7 @@ npm run test:coverage    # Run with coverage report
 ```
 tests/
   config/
-    config.test.js                   # Config defaults and env var branches (8 tests)
+    config.test.js                   # Config defaults and env var branches (9 tests)
     load-env.test.js                 # Load-env file loading chain and error paths (7 tests)
   db/
     database.test.js                 # Database CRUD, pagination, search, sort, SQL injection (10 tests)
@@ -41,7 +41,7 @@ tests/
     seed-settings-coverage.test.js   # Seed-settings.js V8 coverage (2 tests)
 ```
 
-**Total: 146 tests across 13 test files.**
+**Total: 147 tests across 13 test files.**
 
 ## Test design
 

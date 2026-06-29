@@ -1,14 +1,7 @@
-import { createRequire } from 'module'
 import { describe, it, expect, vi } from 'vitest'
-import { save, restore } from '../helpers/coverage'
+import { save, restore, createClearCjs } from '../helpers/coverage'
 
-const _require = createRequire(import.meta.url)
-function clearCjs(...keys) {
-  for (const key of keys) {
-    const resolved = _require.resolve(key)
-    if (_require.cache[resolved]) delete _require.cache[resolved]
-  }
-}
+const clearCjs = createClearCjs(import.meta.url)
 
 function mkReq(url, method, rawBody) {
   const req = {

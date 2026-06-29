@@ -5,8 +5,6 @@ process.env.PORT = '3199';
 
 export default defineConfig({
   test: {
-    include: ['tests/**/*.test.js', 'tests/**/*.spec.js'],
-    exclude: ['tests/helpers/**'],
     globals: true,
     testTimeout: 15000,
     hookTimeout: 15000,
