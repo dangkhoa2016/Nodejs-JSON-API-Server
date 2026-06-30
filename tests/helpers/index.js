@@ -28,6 +28,14 @@ export async function startServer() {
   process.env.REDIS_URL = '';
   process.env.RATE_LIMIT_ENABLED = 'false';
 
+  // Clear CJS caches so config is re-evaluated with current env vars
+  const { createRequire } = await import('module');
+  const _require = createRequire(import.meta.url);
+  for (const key of ['../../src/server/index.js', '../../src/config/index.js', '../../src/config/load-env.js', '../../src/db/index.js', '../../src/middleware/rate-limiter.js']) {
+    const resolved = _require.resolve(key);
+    if (_require.cache[resolved]) delete _require.cache[resolved];
+  }
+
   const serverModule = await import('../../src/server/index.js');
   serverInstance = serverModule.server;
 

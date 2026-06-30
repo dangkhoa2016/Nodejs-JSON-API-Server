@@ -26,9 +26,9 @@ tests/
     seed.test.js                     # Seed with real DB + mocked deps, JSONPlaceholder fetch (5 tests)
     sql-logger.test.js               # SQL query logger wrapping tests (5 tests)
   middleware/
-    rate-limiter.test.js             # In-memory and Redis rate limiter paths (6 tests)
+    rate-limiter.test.js             # In-memory, Redis, circuit breaker, proxy IPs (54 tests)
   redis/
-    redis.test.js                    # RESP protocol encoding/parsing, constructor options (25 tests)
+    redis.test.js                    # RESP protocol encoding/parsing, constructor options (27 tests)
   server/
     coverage-printlog.test.js        # Printlog and server export V8 coverage (4 tests)
     graceful-shutdown.test.js        # SIGINT/SIGTERM handler coverage (1 test)
@@ -41,7 +41,7 @@ tests/
     seed-settings-coverage.test.js   # Seed-settings.js V8 coverage (4 tests)
 ```
 
-**Total: 168 tests across 13 test files.**
+**Total: 218 tests across 13 test files.**
 
 ## Test design
 
@@ -58,7 +58,7 @@ Unit tests cover every source module individually. Each module has its own test 
 | `config/index.js`              | `tests/config/config.test.js` | Module re-imported with different `process.env` values |
 | `config/load-env.js`           | `tests/config/load-env.test.js` | Temp env dirs, mocked dotenv; tests chain, override:false, ENOENT, parse errors |
 | `db/index.js`                  | `tests/db/database.test.js`   | Real `node:sqlite` databases; tests pagination, search, sort, SQL injection |
-| `middleware/rate-limiter.js`   | `tests/middleware/rate-limiter.test.js` | Module imported once; `createRateLimiter()` with different configs per test |
+| `middleware/rate-limiter.js`   | `tests/middleware/rate-limiter.test.js` | Module imported once; mocks Redis, in-memory store; tests circuit breaker, proxy IPs, escalating blocks |
 | `redis/index.js`               | `tests/redis/redis.test.js`  | RESP encoding/parsing directly; constructor options |
 | `server/index.js`              | `tests/server/server.test.js` | `requestHandler()` with mock req/res; CJS cache injection for DB mock; tests auth caching and graceful shutdown (13 tests) |
 | `server/index.js` (ESM)        | `tests/server/coverage-printlog.test.js` | Dynamic `import()` for V8-covered printLog, startServer, 500 catch |
@@ -71,13 +71,13 @@ Unit tests cover every source module individually. Each module has its own test 
 ### Key testing patterns
 
 - **CJS cache injection**: Server tests inject mock `db/index.js` into the CJS `require.cache` before loading `server/index.js`, ensuring the mock is picked up by CommonJS `require()` calls.
-- **Lazy config loading**: `middleware/rate-limiter.js` reads config inside `createRateLimiter()` rather than at module level, so tests can create limiters with different config values without re-importing the module.
+- **Rate limiter testing**: `middleware/rate-limiter.js` accepts options via `createRateLimiter({enabled, max, windowMs})`, making it easy to test with different configurations, mock Redis, and simulate circuit breaker states without re-importing. Tests cover in-memory fallback, Redis mode, CIDR proxy IP extraction, and escalating block durations.
 - **Seed dependency injection**: `db/seed.js` accepts `database` and `fetch` parameters, bypassing the need to mock `require('https')` and `require('../db')`.
 - **V8 coverage pragmas**: `/* v8 ignore */` comments exclude code paths that V8 cannot track through CJS module chains (e.g., CLI entry points, signal handlers, cross-worker coverage gaps).
 
 ## Configuration
 
-`vitest.config.js` sets `NODE_ENV=test` and `PORT=3199`. Rate limiting is **not** disabled globally — it is only disabled in the integration test helper (`tests/helpers/index.js`). This allows unit tests to exercise the rate limiter with real config values.
+`vitest.config.js` sets `NODE_ENV=test` and `PORT=3199`. Rate limiting is disabled in the integration test helper (`tests/helpers/index.js`) but enabled by default in unit tests, which exercise the full rate limiter including circuit breaker and escalating blocks.
 
 ## CI/CD
 

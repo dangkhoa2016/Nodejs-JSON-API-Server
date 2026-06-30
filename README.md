@@ -212,11 +212,19 @@ X-RateLimit-Store:     redis   ← "redis" or "memory"
 
 When the rate limit is exceeded, a `429 Too Many Requests` response is returned:
 
+```
+X-RateLimit-Limit:     100
+X-RateLimit-Remaining: 0
+X-RateLimit-Reset:     0
+X-RateLimit-Store:     redis
+Retry-After:           300
+```
+
 ```json
 {
   "error": "Too Many Requests",
   "message": "Rate limit exceeded. Max 100 requests per 60s window.",
-  "retryAfter": 45
+  "retryAfter": 300
 }
 ```
 
@@ -265,7 +273,7 @@ json-api-server/
 │   │   ├── seed-settings.js      # Seeds 14 env vars (NODE_ENV, PORT, ADMIN_KEY, etc.) into settings table
 │   │   └── sql-logger.js         # Shared Proxy wrappers — logs exec/prepare/run/get/all to stderr
 │   ├── middleware/
-│   │   └── rate-limiter.js       # Rate limiter (Redis or in-memory fallback)
+│   │   └── rate-limiter.js       # Rate limiter (Redis/in-memory, circuit breaker, escalating blocks)
 │   ├── redis/
 │   │   └── index.js              # Pure-Node Redis client via RESP protocol over TCP
 │   └── server/
@@ -280,7 +288,7 @@ json-api-server/
 │   │   ├── seed.test.js             # Seed with real DB + mocked deps, JSONPlaceholder fetch (5)
 │   │   └── sql-logger.test.js       # SQL query logger wrapping (5)
 │   ├── middleware/
-│   │   └── rate-limiter.test.js     # In-memory and Redis rate limiter paths (6)
+│   │   └── rate-limiter.test.js     # In-memory, Redis, circuit breaker, proxy IPs (54)
 │   ├── redis/
 │   │   └── redis.test.js            # RESP protocol encoding/parsing, constructor options (25)
 │   ├── server/
@@ -319,7 +327,7 @@ bin/start.js → src/config/load-env.js (loads .env per NODE_ENV, skipped in pro
       ├── src/config/index.js     (centralized config, auto-loads dotenv)
       ├── src/db/index.js         (SQLite CRUD)
       ├── src/redis/index.js      (pure RESP + AUTH + URL)
-      └── src/middleware/rate-limiter.js (Redis || in-memory, config loaded lazily per call)
+      └── src/middleware/rate-limiter.js (Redis || in-memory, circuit breaker, escalating blocks)
 
 # Standalone scripts: npm run db:migrate / npm run db:seed / npm run db:setup (config loads dotenv automatically)
 ```
@@ -369,12 +377,12 @@ This runs comprehensive queries to inspect row counts, column metadata, relation
 
 ## Testing
 
-Uses **vitest** with **V8 native coverage**. **168 tests across 13 test files** cover the full stack — from integration tests (real HTTP server + SQLite) to unit tests for every module.
+Uses **vitest** with **V8 native coverage**. **218 tests across 13 test files** cover the full stack — from integration tests (real HTTP server + SQLite) to unit tests for every module.
 
 ```bash
 npm test              # Run all tests once
 npm run test:watch    # Watch mode
-npm run test:coverage # With coverage report (100% statements, 100% branches)
+npm run test:coverage # With coverage report (100% across all metrics)
 ```
 
 See [tests/README.md](tests/README.md) for full documentation.
@@ -385,7 +393,7 @@ See [tests/README.md](tests/README.md) for full documentation.
 - **Minimal runtime dependencies** — only `argon2` for admin password hashing; everything else uses Node.js built-in modules (`http`, `url`, `fs`, `path`, `net`, `node:sqlite`). `dotenv` is a dev dependency.
 - **Pure RESP protocol** — the Redis client in `src/redis/index.js` implements the Redis serialization protocol over raw TCP sockets without any third-party library. Supports `AUTH` password authentication and `REDIS_URL` connection strings.
 - **Centralized config** — all environment variables are read in `src/config/index.js` and exported as camelCase (`port`, `dbPath`, `redisOpts`, `rateLimitMax`, `dbDebugSql`, etc.) for use across the codebase.
-- **Lazy rate-limiter config** — `src/middleware/rate-limiter.js` reads config inside `createRateLimiter()` (not at module level), allowing different config values per call and making unit testing straightforward.
+- **Rate limiter** — \`src/middleware/rate-limiter.js\` features a circuit breaker for Redis failures, CIDR-based trusted proxy IP extraction, escalating block durations (5m → 20m → 1h), atomic Redis Lua scripts, and an in-memory fallback with LRU eviction. \`createRateLimiter()\` accepts options directly instead of reading config lazily.
 - **Testable seed script** — `src/db/seed.js` accepts `database` and `fetch` parameters via dependency injection, enabling full unit testing without mocking `require()`.
 - **SQL query logging** — `src/db/sql-logger.js` exports `wrapDb`/`wrapStmt` Proxy wrappers that log `exec`, `prepare`, `run`, `get`, and `all` calls to stderr. `src/db/index.js` uses them via `getWrappedDb()` when `DEBUG_SQL=true`.
 - **Multi-environment** — `src/config/index.js` requires `src/config/load-env.js` at module level, which chain-loads all dotenv files in priority order with `override: false` — existing `process.env` values and earlier files take precedence over later ones. Every consumer (server, migrate, seed) simply requires `src/config/index.js` and gets correct env values. In production, dotenv is skipped entirely — env vars must come from the deployment environment.

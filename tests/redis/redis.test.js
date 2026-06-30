@@ -98,14 +98,20 @@ describe('redis.js', () => {
     await expect(p).resolves.toEqual(Buffer.from('val'))
   })
 
+  it('quit resolves immediately when socket is null', async () => {
+    const RedisClient = _require('../../src/redis/index.js')
+    const c = new RedisClient({ host: '127.0.0.1', port: 6379 })
+    await expect(c.quit()).resolves.toBeUndefined()
+  })
+
   it('quit sends QUIT and destroys socket', async () => {
     const RedisClient = _require('../../src/redis/index.js')
     const c = new RedisClient({ host: '127.0.0.1', port: 6379 })
+    const write = vi.fn()
     const destroy = vi.fn()
-    c.socket = { write: vi.fn(), destroy }
-    const p = c.quit()
-    c._onData(Buffer.from('+OK\r\n'))
-    await p
+    c.socket = { write, destroy }
+    await expect(c.quit()).resolves.toBeUndefined()
+    expect(write).toHaveBeenCalledWith(expect.stringContaining('QUIT'))
     expect(destroy).toHaveBeenCalled()
   })
 
@@ -192,6 +198,14 @@ describe('redis.js', () => {
     expect(c.queue.length).toBe(1)
   })
 
+  it('handles write error in send()', async () => {
+    const RedisClient = _require('../../src/redis/index.js')
+    const c = new RedisClient({ host: '127.0.0.1', port: 6379 })
+    c.socket = { write: vi.fn(() => { throw new Error('write error') }) }
+    await expect(c.send('PING')).rejects.toThrow('write error')
+    expect(c.queue.length).toBe(0)
+  })
+
   it('covers redis helper methods', async () => {
     const RedisClient = _require('../../src/redis/index.js')
     const c = new RedisClient({ host: '127.0.0.1', port: 6379 })
@@ -205,7 +219,8 @@ describe('redis.js', () => {
     c.expire('k', 1)
     c.del('a', 'b')
     c.ttl('k')
-    expect(c.socket.write).toHaveBeenCalledTimes(9)
+    c.eval('return 1', 0)
+    expect(c.socket.write).toHaveBeenCalledTimes(10)
   })
 
   it('connect handler with auth failure via TCP', async () => {

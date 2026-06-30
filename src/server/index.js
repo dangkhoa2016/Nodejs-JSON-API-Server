@@ -13,7 +13,7 @@ const { SETTING_DEFS } = require('../db/seed-settings');
 
 const redis = new RedisClient(redisOpts);
 
-const rateLimiter = createRateLimiter(redis);
+const rateLimiter = createRateLimiter(redis, { enabled: rateLimitEnabled });
 
 (async () => {
   try {

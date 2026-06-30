@@ -142,7 +142,12 @@ class RedisClient {
   send(...args) {
     return new Promise((resolve, reject) => {
       this.queue.push({ resolve, reject });
-      this.socket.write(this._encode(...args));
+      try {
+        this.socket.write(this._encode(...args));
+      } catch (err) {
+        this.queue.shift();
+        reject(err);
+      }
     });
   }
 
@@ -155,9 +160,15 @@ class RedisClient {
   expire(key, seconds) { return this.send('EXPIRE', key, seconds); }
   del(...keys) { return this.send('DEL', ...keys); }
   ttl(key) { return this.send('TTL', key); }
+  eval(script, numKeys, ...args) { return this.send('EVAL', script, numKeys, ...args); }
 
   quit() {
-    return this.send('QUIT').finally(() => this.socket.destroy());
+    if (!this.socket) return Promise.resolve();
+    try {
+      this.socket.write(this._encode('QUIT'));
+    } catch { /* ignore */ }
+    this.socket.destroy();
+    return Promise.resolve();
   }
 }
 
