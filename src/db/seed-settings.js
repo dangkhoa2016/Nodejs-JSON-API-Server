@@ -2,6 +2,7 @@
 
 const { getWrappedDb } = require('./index');
 const { migrate } = require('./migrate');
+const argon2 = require('argon2');
 const { SETTING_DEFS } = require('../config/setting-defs');
 
 async function seedSettings({ database = getWrappedDb(), runMigrate = true } = {}) {
@@ -24,7 +25,8 @@ async function seedSettings({ database = getWrappedDb(), runMigrate = true } = {
   for (const def of SETTING_DEFS) {
     const val = process.env[def.key];
     if (val !== undefined) {
-      upsert.run(def.key, val, def.description, now);
+      const stored = def.key === 'ADMIN_KEY' ? await argon2.hash(val) : val;
+      upsert.run(def.key, stored, def.description, now);
       count++;
     } else {
       upsert.run(def.key, '', def.description, now);

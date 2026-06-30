@@ -3,10 +3,13 @@
 const http = require('http');
 
 const { port, redisOpts, rateLimitMax, rateLimitEnabled,
-  rateLimitWindowMs, rateLimitWindowSec, maxBodySize } = require('../config');
+  rateLimitWindowMs, rateLimitWindowSec, maxBodySize, adminKey } = require('../config');
+const argon2 = require('argon2');
 const RedisClient = require('../redis');
 const { createRateLimiter } = require('../middleware/rate-limiter');
 const db = require('../db');
+const { seed } = require('../db/seed');
+const { SETTING_DEFS } = require('../db/seed-settings');
 
 const redis = new RedisClient(redisOpts);
 
@@ -200,6 +203,161 @@ function handleHealth(res) {
   });
 }
 
+const authCache = new Map();
+const AUTH_CACHE_TTL_MS = 5_000;
+
+function getCachedAuth(token) {
+  const entry = authCache.get(token);
+  if (entry && Date.now() - entry.ts < AUTH_CACHE_TTL_MS) {
+    return entry.valid;
+  }
+  authCache.delete(token);
+  return undefined;
+}
+
+function setCachedAuth(token, valid) {
+  /* v8 ignore next 5 */
+  if (authCache.size > 1000) {
+    const cutoff = Date.now() - AUTH_CACHE_TTL_MS;
+    for (const [key, entry] of authCache) {
+      if (entry.ts < cutoff) authCache.delete(key);
+    }
+  }
+  authCache.set(token, { valid, ts: Date.now() });
+}
+
+function resetAuthCache() {
+  authCache.clear();
+}
+
+async function checkAdminAuth(req) {
+  /* v8 ignore next */
+  if (!adminKey) return false;
+  const auth = req.headers['authorization'] || '';
+  const match = auth.match(/^Bearer\s+(.+)$/i);
+  if (!match) return false;
+  const token = match[1];
+  const cached = getCachedAuth(token);
+  if (cached !== undefined) return cached;
+  try {
+    const d = db.getWrappedDb();
+    const row = d.prepare('SELECT value FROM settings WHERE key = ?').get('ADMIN_KEY');
+    /* v8 ignore next */
+    if (!row) return false;
+    const valid = await argon2.verify(row.value, token);
+    setCachedAuth(token, valid);
+    return valid;
+  } catch {
+    setCachedAuth(token, false);
+    return false;
+  }
+}
+
+async function handleAdmin(req, res, pathname, method) {
+  if (!(await checkAdminAuth(req))) {
+    /* v8 ignore start */ if (!adminKey) {
+      return json(res, 401, { error: 'Admin not configured', message: 'ADMIN_KEY environment variable is not set' });
+    } /* v8 ignore stop */
+    return json(res, 401, { error: 'Unauthorized' });
+  }
+
+  const SENSITIVE_KEYS = ['REDIS_PASSWORD', 'ADMIN_KEY'];
+
+  if (pathname === '/api/admin/settings' && method === 'GET') {
+    const rows = db.listAll('settings').map((r) => SENSITIVE_KEYS.includes(r.key) ? { ...r, value: '***' } : r);
+    return json(res, 200, rows);
+  }
+
+  const settingsMatch = pathname.match(/^\/api\/admin\/settings\/(.+)$/);
+  if (settingsMatch && method === 'PATCH') {
+    return await handleAdminPatchSetting(req, res, settingsMatch[1]);
+  }
+
+  if (pathname === '/api/admin/reset-database' && method === 'POST') {
+    return await handleAdminResetDatabase(req, res);
+  }
+
+  return notFound(res, `Unknown admin route: ${pathname}`);
+}
+
+async function handleAdminPatchSetting(req, res, settingKey) {
+  const body = await readBodySafe(req, res);
+  if (body === null) return;
+
+  if (body.value === undefined) {
+    return badRequest(res, 'Missing "value" in request body');
+  }
+  if (body.value === null || typeof body.value === 'object') {
+    return badRequest(res, 'Setting value must be a string or number');
+  }
+
+  const d = db.getWrappedDb();
+  const existing = d.prepare('SELECT * FROM settings WHERE key = ?').get(settingKey);
+
+  if (!existing) {
+    const def = SETTING_DEFS.find(s => s.key === settingKey);
+    if (!def) {
+      return notFound(res, `Setting '${settingKey}' not found`);
+    }
+    const valToStore = settingKey === 'ADMIN_KEY' ? await argon2.hash(body.value) : body.value;
+    d.prepare(`INSERT INTO settings (key, value, description, updated_at) VALUES (?, ?, ?, datetime('now'))`).run(settingKey, valToStore, def.description);
+    const created = d.prepare('SELECT * FROM settings WHERE key = ?').get(settingKey);
+    return json(res, 201, created);
+  }
+
+  const valToStore = settingKey === 'ADMIN_KEY' ? await argon2.hash(body.value) : body.value;
+  d.prepare(`UPDATE settings SET value = ?, updated_at = datetime('now') WHERE key = ?`).run(valToStore, settingKey);
+  const updated = d.prepare('SELECT * FROM settings WHERE key = ?').get(settingKey);
+  json(res, 200, updated);
+}
+
+let resetLock = Promise.resolve();
+const RESET_LOCK_TIMEOUT_MS = 30_000;
+
+async function withResetLock(fn) {
+  let release;
+  let timer;
+  const prev = resetLock;
+  resetLock = new Promise((resolve) => { release = resolve; });
+  await prev;
+  /* v8 ignore next 2 */
+  timer = setTimeout(() => { release(); }, RESET_LOCK_TIMEOUT_MS);
+  try {
+    return await fn();
+  } finally {
+    clearTimeout(timer);
+    release();
+  }
+}
+
+async function handleAdminResetDatabase(req, res) {
+  await withResetLock(async () => {
+    const d = db.getWrappedDb();
+    d.exec('BEGIN');
+    try {
+      const deleteOrder = ['photos', 'comments', 'albums', 'posts', 'todos', 'users'];
+      for (const table of deleteOrder) {
+        d.prepare(`DELETE FROM ${table}`).run();
+      }
+      /* v8 ignore next */
+      if (d.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='sqlite_sequence'").get()) {
+        d.exec('DELETE FROM sqlite_sequence');
+      }
+      /* v8 ignore next 4 */
+      const fetchFn = async (url) => {
+        const response = await globalThis.fetch(url);
+        return response.json();
+      };
+      await seed({ database: d, fetch: fetchFn, runMigrate: false, skipTransaction: true });
+      d.exec('COMMIT');
+      json(res, 200, { message: 'Database reset and re-seeded successfully' });
+    } catch (error) {
+      d.exec('ROLLBACK');
+      throw error;
+    }
+  });
+}
+
 async function requestHandler(req, res) {
   const parsed = new URL(req.url, 'http://localhost');
   const pathname = parsed.pathname;
@@ -233,6 +391,15 @@ async function requestHandler(req, res) {
   });
   /* v8 ignore next */
   if (res.writableEnded) return;
+
+  if (pathname.startsWith('/api/admin/')) {
+    try {
+      return await handleAdmin(req, res, pathname, method);
+    } catch (err) {
+      console.error('[Error]', err);
+      return json(res, 500, { error: 'Internal Server Error', message: err.message });
+    }
+  }
 
   const route = parseRoute(pathname);
   if (!route) return notFound(res, `Unknown route: ${pathname}`);
@@ -308,4 +475,4 @@ if (process.listenerCount('SIGINT') === 0) {
 }
 
 /* v8 ignore stop */
-module.exports = { server, requestHandler, printLog, closeServer };
+module.exports = { server, requestHandler, printLog, closeServer, resetAuthCache };

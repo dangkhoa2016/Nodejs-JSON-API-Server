@@ -1,12 +1,17 @@
-import { beforeAll, afterAll, describe, it, expect } from 'vitest';
+import { beforeAll, afterAll, afterEach, describe, it, expect, vi } from 'vitest';
 import { startServer, stopServer, request } from '../helpers';
 
 beforeAll(async () => {
+  process.env.ADMIN_KEY = 'integration-test-admin-key';
   await startServer();
 }, 20000);
 
 afterAll(() => {
   stopServer();
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
 });
 
 describe('Health & Root', () => {
@@ -506,5 +511,112 @@ describe('Sorting', () => {
     expect(res.body.length).toBe(2);
     expect(res.body[0].id).toBe(100);
     expect(res.body[1].id).toBe(4);
+  });
+});
+
+describe('Admin routes', () => {
+  let adminToken = 'integration-test-admin-key';
+
+  it('GET /api/admin/settings returns 401 without Authorization header', async () => {
+    const res = await request('/api/admin/settings');
+    expect(res.status).toBe(401);
+    expect(res.body.error).toBeDefined();
+  });
+
+  it('GET /api/admin/settings returns 401 with wrong token', async () => {
+    const res = await request('/api/admin/settings', {
+      headers: { authorization: 'Bearer wrong-key' },
+    });
+    expect(res.status).toBe(401);
+  });
+
+  it('GET /api/admin/settings returns 200 with valid auth', async () => {
+    const res = await request('/api/admin/settings', {
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body)).toBe(true);
+    expect(res.body.length).toBeGreaterThan(0);
+  });
+
+  it('GET /api/admin/settings hides sensitive values (ADMIN_KEY, REDIS_PASSWORD)', async () => {
+    const res = await request('/api/admin/settings', {
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(res.status).toBe(200);
+    const adminKeySetting = res.body.find(s => s.key === 'ADMIN_KEY');
+    expect(adminKeySetting).toBeDefined();
+    expect(adminKeySetting.value).toBe('***');
+    const redisPwSetting = res.body.find(s => s.key === 'REDIS_PASSWORD');
+    expect(redisPwSetting).toBeDefined();
+    expect(redisPwSetting.value).toBe('***');
+  });
+
+  it('PATCH /api/admin/settings/:key updates a setting value', async () => {
+    const res = await request('/api/admin/settings/NODE_ENV', {
+      method: 'PATCH',
+      headers: { authorization: `Bearer ${adminToken}` },
+      body: { value: 'staging' },
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.value).toBe('staging');
+  });
+
+  it('PATCH /api/admin/settings/:key with invalid body returns 400', async () => {
+    const res = await request('/api/admin/settings/NODE_ENV', {
+      method: 'PATCH',
+      headers: { authorization: `Bearer ${adminToken}` },
+      rawBody: 'not-json',
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it('PATCH /api/admin/settings/:key for nonexistent setting returns 404', async () => {
+    const res = await request('/api/admin/settings/NONEXISTENT_KEY', {
+      method: 'PATCH',
+      headers: { authorization: `Bearer ${adminToken}` },
+      body: { value: 'test' },
+    });
+    expect(res.status).toBe(404);
+  });
+
+  it('Unknown admin route returns 404', async () => {
+    const res = await request('/api/admin/unknown', {
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(res.status).toBe(404);
+  });
+
+  it('Admin routes use cached auth token on repeated requests', async () => {
+    const res1 = await request('/api/admin/settings', {
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(res1.status).toBe(200);
+
+    const res2 = await request('/api/admin/settings', {
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(res2.status).toBe(200);
+  });
+
+  it('POST /api/admin/reset-database re-seeds successfully', async () => {
+    const payload = {
+      users: [{ id: 1, name: 'Alice', username: 'alice', email: 'alice@example.com', phone: '1', website: 'w', address: { city: 'Hanoi' }, company: { name: 'ACME' } }],
+      posts: [{ id: 1, userId: 1, title: 'Post', body: 'Body' }],
+      comments: [{ id: 1, postId: 1, name: 'Commenter', email: 'c@example.com', body: 'Comment' }],
+      albums: [{ id: 1, userId: 1, title: 'Album' }],
+      photos: [{ id: 1, albumId: 1, title: 'Photo', url: 'u', thumbnailUrl: 't' }],
+      todos: [{ id: 1, userId: 1, title: 'Todo', completed: true }],
+    };
+    vi.stubGlobal('fetch', async (url) => ({
+      ok: true,
+      json: async () => payload[new URL(url).pathname.slice(1)],
+    }));
+    const res = await request('/api/admin/reset-database', {
+      method: 'POST',
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.message).toContain('reset');
   });
 });

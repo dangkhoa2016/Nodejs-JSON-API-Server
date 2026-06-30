@@ -1,6 +1,17 @@
 # json-api-server
 
-A JSONPlaceholder-compatible REST API built with **Node.js built-ins only** — minimal runtime dependencies. Uses `node:sqlite` for storage and a custom Redis client implemented over the raw RESP protocol via TCP sockets.
+A JSONPlaceholder-compatible REST API built mostly with **Node.js built-ins** — the only runtime dependency is `argon2` for admin password hashing. Uses `node:sqlite` for storage and a custom Redis client implemented over the raw RESP protocol via TCP sockets.
+
+## Technologies Used
+
+- **Node.js >= 22** — runtime with built-in `node:sqlite`, `node:http`, `node:net`, etc.
+- **node:sqlite** — SQLite database engine (built-in)
+- **node:http** — HTTP server (built-in, no Express/Fastify)
+- **node:net** — raw TCP sockets for custom Redis RESP client (built-in)
+- **argon2** — secure password hashing for admin authentication (only runtime dependency)
+- **RESP protocol** — custom Redis client implementing the Redis Serialization Protocol over TCP
+- **dotenv** — environment file loading (dev dependency only, skipped in production)
+- **vitest** — test runner with V8 native coverage (dev dependency)
 
 ## Requirements
 
@@ -54,6 +65,7 @@ Environment files are loaded by `src/config/load-env.js` (auto-run via `src/conf
 | `SEED_API_BASE_URL`    | `https://jsonplaceholder.typicode.com` | Base URL for seed data API |
 | `MAX_BODY_SIZE`        | `1048576`   | Max request body size in bytes (minimum 1) |
 | `DEFAULT_PAGE_SIZE`   | `10`        | Default number of results per page for `_page`/`_limit` pagination |
+| `ADMIN_KEY`           | _(none)_    | Master key to authenticate admin API requests (Bearer token) |
 
 ---
 
@@ -149,12 +161,39 @@ GET /api/posts?_sort=id&_order=desc&_limit=2
 
 ### System Endpoints
 
-| Path              | Description                          |
-|-------------------|--------------------------------------|
-| `GET /`           | API info with available endpoints    |
-| `GET /api`        | API info (same as above)             |
-| `GET /health`     | Server status (Redis, tables, rate limit config) |
-| `GET /api/health` | Same as above                        |
+| Path                              | Description                          |
+|-----------------------------------|--------------------------------------|
+| `GET /`                           | API info with available endpoints    |
+| `GET /api`                        | API info (same as above)             |
+| `GET /health`                     | Server status (Redis, tables, rate limit config) |
+| `GET /api/health`                 | Same as above                        |
+| `GET /api/admin/settings`         | List all settings (requires auth)    |
+| `PATCH /api/admin/settings/:key`  | Update a setting value (requires auth) |
+| `POST /api/admin/reset-database`  | Clear data tables and re-seed from JSONPlaceholder (requires auth) |
+
+### Admin API
+
+Admin endpoints are protected by Bearer token authentication using the `ADMIN_KEY` environment variable. Settings values are stored in the `settings` database table.
+
+```bash
+# List all settings
+curl http://localhost:3000/api/admin/settings \
+  -H "Authorization: Bearer my-secret-key"
+
+# Update a setting
+curl -X PATCH http://localhost:3000/api/admin/settings/NODE_ENV \
+  -H "Authorization: Bearer my-secret-key" \
+  -H "Content-Type: application/json" \
+  -d '{"value": "production"}'
+
+# Reset database (clears all data and re-fetches from JSONPlaceholder)
+curl -X POST http://localhost:3000/api/admin/reset-database \
+  -H "Authorization: Bearer my-secret-key"
+```
+
+The `ADMIN_KEY` is hashed with **argon2** before storage. When updating the password via `PATCH /api/admin/settings/ADMIN_KEY`, the new value is automatically hashed. Passwords are never stored in plaintext.
+
+Argon2 verification results are **cached in-memory for 5 seconds** per token, avoiding repeated hashing on consecutive admin requests. On error, the result is also cached as invalid — preventing timing or error-message side-channel leaks.
 
 ---
 
@@ -233,10 +272,10 @@ json-api-server/
 │       └── index.js              # HTTP server, routing, middleware, handlers
 ├── tests/
 │   ├── config/
-│   │   ├── config.test.js           # Config defaults and env var branches (8)
+│   │   ├── config.test.js           # Config defaults and env var branches (9)
 │   │   └── load-env.test.js         # Load-env file loading chain and error paths (7)
 │   ├── db/
-│   │   ├── database.test.js         # Database CRUD, pagination, search, sort, SQL injection (9)
+│   │   ├── database.test.js         # Database CRUD, pagination, search, sort, SQL injection (10)
 │   │   ├── migrate.test.js          # Migration success and failure paths (2)
 │   │   ├── seed.test.js             # Seed with real DB + mocked deps, JSONPlaceholder fetch (5)
 │   │   └── sql-logger.test.js       # SQL query logger wrapping (5)
@@ -245,16 +284,16 @@ json-api-server/
 │   ├── redis/
 │   │   └── redis.test.js            # RESP protocol encoding/parsing, constructor options (25)
 │   ├── server/
-│   │   ├── coverage-printlog.test.js # V8 coverage: printLog, startServer, 500 catch (3)
-│   │   ├── graceful-shutdown.test.js # Graceful shutdown via SIGINT/SIGTERM (1)
-│   │   ├── integration.test.js      # API integration tests — real HTTP + SQLite (63)
-│   │   └── server.test.js           # Server request handler and startup paths (5)
+│   │   ├── coverage-printlog.test.js # Printlog and server export V8 coverage (4)
+│   │   ├── graceful-shutdown.test.js # SIGINT/SIGTERM handler coverage (1)
+│   │   ├── integration.test.js      # API integration tests — real HTTP + SQLite (77)
+│   │   └── server.test.js           # Server request handler, admin auth, graceful shutdown (13)
 │   ├── README.md                    # Testing documentation
 │   └── helpers/
 │       ├── coverage.js              # Test-coverage utilities (save/restore/setEnv/clearCjs)
 │       ├── index.js                 # startServer / stopServer / request utilities
 │       └── seed.js                  # Standalone script to create & seed temp DB
-│   └── seed-settings-coverage.test.js  # Seed-settings.js V8 coverage (2)
+│   └── seed-settings-coverage.test.js  # Seed-settings.js V8 coverage (4)
 ├── manual/
 │   ├── curl.sh                  # Quick curl commands
 │   └── inspect-queries.sql      # SQL queries for database inspection
@@ -330,12 +369,12 @@ This runs comprehensive queries to inspect row counts, column metadata, relation
 
 ## Testing
 
-Uses **vitest** with **V8 native coverage**. **147 tests across 13 test files** cover the full stack — from integration tests (real HTTP server + SQLite) to unit tests for every module.
+Uses **vitest** with **V8 native coverage**. **168 tests across 13 test files** cover the full stack — from integration tests (real HTTP server + SQLite) to unit tests for every module.
 
 ```bash
 npm test              # Run all tests once
 npm run test:watch    # Watch mode
-npm run test:coverage # With coverage report (~98% statements, ~98% branches)
+npm run test:coverage # With coverage report (100% statements, 100% branches)
 ```
 
 See [tests/README.md](tests/README.md) for full documentation.
@@ -343,7 +382,7 @@ See [tests/README.md](tests/README.md) for full documentation.
 
 ## Implementation Notes
 
-- **Minimal runtime dependencies** — only Node.js built-in modules (`http`, `url`, `fs`, `path`, `net`, `node:sqlite`). `dotenv` is a dev dependency.
+- **Minimal runtime dependencies** — only `argon2` for admin password hashing; everything else uses Node.js built-in modules (`http`, `url`, `fs`, `path`, `net`, `node:sqlite`). `dotenv` is a dev dependency.
 - **Pure RESP protocol** — the Redis client in `src/redis/index.js` implements the Redis serialization protocol over raw TCP sockets without any third-party library. Supports `AUTH` password authentication and `REDIS_URL` connection strings.
 - **Centralized config** — all environment variables are read in `src/config/index.js` and exported as camelCase (`port`, `dbPath`, `redisOpts`, `rateLimitMax`, `dbDebugSql`, etc.) for use across the codebase.
 - **Lazy rate-limiter config** — `src/middleware/rate-limiter.js` reads config inside `createRateLimiter()` (not at module level), allowing different config values per call and making unit testing straightforward.
@@ -351,6 +390,7 @@ See [tests/README.md](tests/README.md) for full documentation.
 - **SQL query logging** — `src/db/sql-logger.js` exports `wrapDb`/`wrapStmt` Proxy wrappers that log `exec`, `prepare`, `run`, `get`, and `all` calls to stderr. `src/db/index.js` uses them via `getWrappedDb()` when `DEBUG_SQL=true`.
 - **Multi-environment** — `src/config/index.js` requires `src/config/load-env.js` at module level, which chain-loads all dotenv files in priority order with `override: false` — existing `process.env` values and earlier files take precedence over later ones. Every consumer (server, migrate, seed) simply requires `src/config/index.js` and gets correct env values. In production, dotenv is skipped entirely — env vars must come from the deployment environment.
 - **SQL injection prevention** — `src/db/index.js` validates `_sort` against a whitelist of known columns and quotes identifiers with `""`; LIKE wildcards (`%`, `_`) are escaped to prevent injection through the `q` parameter
+- **Argon2 auth cache** — `src/server/index.js` caches `ADMIN_KEY` verification results in a `Map` with 5-second TTL, avoiding repeated argon2 hashing on burst admin requests
 - **CORS** enabled on all routes
 - **Graceful shutdown** — handles `SIGINT` and `SIGTERM` to close the server and Redis connection cleanly
 

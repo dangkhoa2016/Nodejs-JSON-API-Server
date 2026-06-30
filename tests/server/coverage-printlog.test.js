@@ -113,4 +113,22 @@ describe('server.js ESM coverage', () => {
     await new Promise((r) => mod.server.close(r))
     restore(s)
   })
+
+  it('covers resetAuthCache and server export', async () => {
+    const s = save('START_SERVER', 'DB_PATH')
+    process.env.START_SERVER = 'false'
+    process.env.DB_PATH = ':memory:'
+
+    clearCjs('../../src/config/index.js', '../../src/config/load-env.js')
+    vi.resetModules()
+    const mod = await import('../../src/server/index.js')
+
+    expect(typeof mod.resetAuthCache).toBe('function')
+    expect(() => mod.resetAuthCache()).not.toThrow()
+    expect(mod.server).toBeDefined()
+    expect(typeof mod.requestHandler).toBe('function')
+    expect(typeof mod.printLog).toBe('function')
+
+    restore(s)
+  })
 })

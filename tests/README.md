@@ -19,7 +19,7 @@ npm run test:coverage    # Run with coverage report
 tests/
   config/
     config.test.js                   # Config defaults and env var branches (9 tests)
-    load-env.test.js                 # Load-env file loading chain and error paths (7 tests)
+    load-env.test.js                 # Chain-loading, override:false, production skip, fallback (7 tests)
   db/
     database.test.js                 # Database CRUD, pagination, search, sort, SQL injection (10 tests)
     migrate.test.js                  # Migration success and failure paths (2 tests)
@@ -30,18 +30,18 @@ tests/
   redis/
     redis.test.js                    # RESP protocol encoding/parsing, constructor options (25 tests)
   server/
-    coverage-printlog.test.js        # V8 coverage: printLog, startServer, 500 catch (3 tests)
+    coverage-printlog.test.js        # Printlog and server export V8 coverage (4 tests)
     graceful-shutdown.test.js        # SIGINT/SIGTERM handler coverage (1 test)
-    integration.test.js              # API integration tests — real HTTP + SQLite (67 tests)
-    server.test.js                   # Server request handler and startup paths (5 tests)
+    integration.test.js              # API integration tests — real HTTP + SQLite (77 tests)
+    server.test.js                   # Server request handler, admin auth, graceful shutdown (13 tests)
   helpers/
     coverage.js                      # Shared test utilities (save/restore/setEnv/clearCjs)
     index.js                         # startServer / stopServer / request utilities
     seed.js                          # Standalone script to create & seed temp DB
-    seed-settings-coverage.test.js   # Seed-settings.js V8 coverage (2 tests)
+    seed-settings-coverage.test.js   # Seed-settings.js V8 coverage (4 tests)
 ```
 
-**Total: 147 tests across 13 test files.**
+**Total: 168 tests across 13 test files.**
 
 ## Test design
 
@@ -56,12 +56,13 @@ Unit tests cover every source module individually. Each module has its own test 
 | Module                         | Test file                    | Approach |
 |--------------------------------|------------------------------|----------|
 | `config/index.js`              | `tests/config/config.test.js` | Module re-imported with different `process.env` values |
-| `db/index.js`                  | `tests/db/database.test.js`   | Real `node:sqlite` databases with per-test temp files |
+| `config/load-env.js`           | `tests/config/load-env.test.js` | Temp env dirs, mocked dotenv; tests chain, override:false, ENOENT, parse errors |
+| `db/index.js`                  | `tests/db/database.test.js`   | Real `node:sqlite` databases; tests pagination, search, sort, SQL injection |
 | `middleware/rate-limiter.js`   | `tests/middleware/rate-limiter.test.js` | Module imported once; `createRateLimiter()` with different configs per test |
 | `redis/index.js`               | `tests/redis/redis.test.js`  | RESP encoding/parsing directly; constructor options |
-| `server/index.js`              | `tests/server/server.test.js` | `requestHandler()` with mock req/res; CJS cache injection for DB mock |
-| `server/index.js` (child)      | `tests/server/graceful-shutdown.test.js` | SIGINT/SIGTERM via child process (V8 coverage) |
+| `server/index.js`              | `tests/server/server.test.js` | `requestHandler()` with mock req/res; CJS cache injection for DB mock; tests auth caching and graceful shutdown (13 tests) |
 | `server/index.js` (ESM)        | `tests/server/coverage-printlog.test.js` | Dynamic `import()` for V8-covered printLog, startServer, 500 catch |
+| `server/index.js` (child)      | `tests/server/graceful-shutdown.test.js` | SIGINT/SIGTERM via child process (V8 coverage) |
 | `db/migrate.js`                | `tests/db/migrate.test.js`   | Real migration + corrupt DB failure path |
 | `db/seed.js`                   | `tests/db/seed.test.js`      | Dependency injection — `database` and `fetch` injected |
 | `db/seed-settings.js`          | `tests/seed-settings-coverage.test.js` | Real DB + mock DB paths (V8 coverage) |
@@ -90,9 +91,9 @@ npm run test:coverage
 
 | Metric      | Coverage |
 |-------------|----------|
-| Statements  | ~98%    |
-| Branches    | ~98%    |
-| Functions   | ~96%    |
-| Lines       | ~98%    |
+| Statements  | 100%    |
+| Branches    | 100%    |
+| Functions   | 100%    |
+| Lines       | 100%    |
 
-All source files reach high coverage. The main low-coverage area is `seed.js` CLI paths (25% functions, 86.3% statements) — the `seedDatabase()` entry point and `process.on('uncaughtException')` handler run as child processes and escape V8 tracking.
+All source files reach 100% V8 coverage across all metrics.
