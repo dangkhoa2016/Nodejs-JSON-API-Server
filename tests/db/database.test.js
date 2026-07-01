@@ -332,4 +332,36 @@ describe('database.js', () => {
 
     restore(s)
   })
+
+  it('covers cascade delete — deleting a user removes related todos', () => {
+    const dbPath = path.join(tmpDir, 'db-cascade.db')
+    const s = save('DB_PATH', 'DEBUG_SQL')
+    setEnv({ DB_PATH: dbPath, DEBUG_SQL: 'false' })
+    clearCjs('../../src/db/index.js', '../../src/config/index.js')
+    const mod = _require('../../src/db/index.js')
+    const db = mod.getDb()
+    db.exec(`
+      CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT);
+      CREATE TABLE todos (id INTEGER PRIMARY KEY, userId INTEGER, title TEXT);
+      CREATE TABLE posts (id INTEGER PRIMARY KEY, userId INTEGER, title TEXT);
+      CREATE TABLE albums (id INTEGER PRIMARY KEY, userId INTEGER, title TEXT);
+    `)
+    db.prepare('INSERT INTO users (id, name) VALUES (1, \'Alice\')').run()
+    db.prepare('INSERT INTO todos (id, userId, title) VALUES (?, ?, ?)').run(1, 1, 'Todo 1')
+    db.prepare('INSERT INTO todos (id, userId, title) VALUES (?, ?, ?)').run(2, 1, 'Todo 2')
+    db.prepare('INSERT INTO posts (id, userId, title) VALUES (?, ?, ?)').run(1, 1, 'Post 1')
+
+    expect(mod.listAll('todos')).toHaveLength(2)
+    expect(mod.listAll('posts')).toHaveLength(1)
+
+    const deleted = mod.deleteOne('users', 1)
+    expect(deleted.id).toBe(1)
+    expect(deleted.name).toBe('Alice')
+
+    expect(mod.listAll('todos')).toHaveLength(0)
+    expect(mod.listAll('posts')).toHaveLength(0)
+    expect(mod.getOne('users', 1)).toBeNull()
+
+    restore(s)
+  })
 })

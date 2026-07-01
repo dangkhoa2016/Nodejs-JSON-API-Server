@@ -93,6 +93,8 @@ Environment files are loaded by `src/config/load-env.js` (auto-run via `src/conf
 | `PATCH`  | `/api/:table/:id`           | Partial update               |
 | `DELETE` | `/api/:table/:id`           | Delete resource              |
 
+> **Cascade deletes**: Deleting a `user` removes their `posts`, `albums`, and `todos`. Deleting a `post` removes its `comments`. Deleting an `album` removes its `photos`.
+
 ### Query String Filtering & Pagination
 
 ```bash

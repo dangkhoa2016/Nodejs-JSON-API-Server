@@ -21,14 +21,14 @@ tests/
     config.test.js                   # Config defaults and env var branches (9 tests)
     load-env.test.js                 # Chain-loading, override:false, production skip, fallback (7 tests)
   db/
-    database.test.js                 # Database CRUD, pagination, search, sort, SQL injection (10 tests)
+    database.test.js                 # Database CRUD, pagination, search, sort, SQL injection, cascade delete (11 tests)
     migrate.test.js                  # Migration success and failure paths (2 tests)
     seed.test.js                     # Seed with real DB + mocked deps, JSONPlaceholder fetch (5 tests)
     sql-logger.test.js               # SQL query logger wrapping tests (5 tests)
   middleware/
     rate-limiter.test.js             # In-memory, Redis, circuit breaker, proxy IPs (54 tests)
   redis/
-    redis.test.js                    # RESP protocol encoding/parsing, constructor options (27 tests)
+    redis.test.js                    # RESP protocol encoding/parsing, constructor options, eval method (27 tests)
   server/
     coverage-printlog.test.js        # Printlog and server export V8 coverage (4 tests)
     graceful-shutdown.test.js        # SIGINT/SIGTERM handler coverage (1 test)
@@ -42,7 +42,7 @@ tests/
     seed-settings-coverage.test.js   # Seed-settings.js V8 coverage (4 tests)
 ```
 
-**Total: 218 tests across 13 test files.**
+**Total: 219 tests across 13 test files.**
 
 ## Test design
 

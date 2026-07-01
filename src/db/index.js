@@ -168,10 +168,24 @@ function updateOne(table, id, data, replace = false) {
   return getOne(table, id);
 }
 
+const CASCADE_MAP = {
+  users:   { key: 'userId',   children: ['posts', 'albums', 'todos'] },
+  posts:   { key: 'postId',   children: ['comments'] },
+  albums:  { key: 'albumId',  children: ['photos'] },
+};
+
 function deleteOne(table, id) {
   const d = getWrappedDb();
   const existing = getOne(table, id);
   if (!existing) return null;
+
+  const cascade = CASCADE_MAP[table];
+  if (cascade) {
+    for (const child of cascade.children) {
+      d.prepare(`DELETE FROM ${child} WHERE ${cascade.key} = ?`).run(id);
+    }
+  }
+
   d.prepare(`DELETE FROM ${table} WHERE id = ?`).run(id);
   return existing;
 }
