@@ -615,6 +615,7 @@ describe('Admin routes', () => {
     const res = await request('/api/admin/reset-database', {
       method: 'POST',
       headers: { authorization: `Bearer ${adminToken}` },
+      body: { confirm: true },
     });
     expect(res.status).toBe(200);
     expect(res.body.message).toContain('reset');

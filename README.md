@@ -188,7 +188,9 @@ curl -X PATCH http://localhost:3000/api/admin/settings/NODE_ENV \
 
 # Reset database (clears all data and re-fetches from JSONPlaceholder)
 curl -X POST http://localhost:3000/api/admin/reset-database \
-  -H "Authorization: Bearer my-secret-key"
+  -H "Authorization: Bearer my-secret-key" \
+  -H "Content-Type: application/json" \
+  -d '{"confirm": true}'
 ```
 
 The `ADMIN_KEY` is hashed with **argon2** before storage. When updating the password via `PATCH /api/admin/settings/ADMIN_KEY`, the new value is automatically hashed. Passwords are never stored in plaintext.

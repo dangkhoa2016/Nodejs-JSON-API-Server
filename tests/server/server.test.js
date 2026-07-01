@@ -5,6 +5,7 @@ import { mkdtempSync } from 'fs'
 import { tmpdir } from 'os'
 import { createRequire } from 'module'
 import { save, restore, setEnv, configMockFactory } from '../helpers/coverage'
+import { mkDb, mkRedis, mkReq, mkRes } from '../helpers/mock-factory'
 
 const tmpDir = mkdtempSync(path.join(tmpdir(), 'cov-srv-'))
 const _require = createRequire(import.meta.url)
@@ -26,17 +27,10 @@ describe('server.js', () => {
   it('handles 500 when db throws', async () => {
     const s = save('START_SERVER', 'PORT', 'REDIS_URL', 'DB_PATH')
     setEnv({ START_SERVER: 'false', PORT: '0', REDIS_URL: '', DB_PATH: path.join(tmpDir, 'srv1.db') })
-    const mockDb = {
-      getDb: () => ({ prepare: () => ({ all: () => [], get: () => null, run: () => {} }), exec: () => {} }),
-      getWrappedDb: () => ({ prepare: () => ({ all: () => [], get: () => null, run: () => {} }), exec: () => {} }),
+    const mockDb = mkDb({
       listAll: () => { throw new Error('boom') },
-      getOne: () => null,
       insertOne: () => { throw new Error('duplicate') },
-      updateOne: () => null,
-      deleteOne: () => null,
-      nextId: () => 1,
-      TABLES: ['users', 'posts', 'comments', 'albums', 'photos', 'todos'],
-    }
+    })
     clearCjs('../../src/server/index.js', '../../src/db/index.js', '../../src/middleware/rate-limiter.js')
     const resolvedDb = _require.resolve('../../src/db/index.js')
     _require.cache[resolvedDb] = { exports: mockDb, id: resolvedDb, filename: resolvedDb, loaded: true }
@@ -44,33 +38,24 @@ describe('server.js', () => {
       vi.resetModules()
       const { requestHandler } = await import('../../src/server/index.js')
 
-      const mkReq = (url, method, body) => ({
-        url, method, headers: {}, socket: { remoteAddress: '::1' },
-        on: (evt, cb) => {
-          if (evt === 'data' && body) cb(body)
-          if (evt === 'end') queueMicrotask(() => cb())
-        },
-      })
-      const mkRes = () => ({ writeHead: vi.fn(), end: vi.fn(), setHeader: vi.fn(), writableEnded: false })
-
       const res1 = mkRes()
       await requestHandler(mkReq('/api/users', 'GET'), res1)
       expect(res1.writeHead).toHaveBeenCalledWith(500, expect.anything())
 
       const res2 = mkRes()
-      await requestHandler(mkReq('/api/users', 'POST', '{"name":"X"}'), res2)
+      await requestHandler(mkReq('/api/users', 'POST', {}, '{"name":"X"}'), res2)
       expect(res2.writeHead).toHaveBeenCalledWith(400, expect.anything())
 
       const res3 = mkRes()
-      await requestHandler(mkReq('/api/users/1', 'PUT', 'bad-json'), res3)
+      await requestHandler(mkReq('/api/users/1', 'PUT', {}, 'bad-json'), res3)
       expect(res3.writeHead).toHaveBeenCalledWith(400, expect.anything())
 
       const res4 = mkRes()
-      await requestHandler(mkReq('/api/users/1', 'PATCH', 'bad-json'), res4)
+      await requestHandler(mkReq('/api/users/1', 'PATCH', {}, 'bad-json'), res4)
       expect(res4.writeHead).toHaveBeenCalledWith(400, expect.anything())
 
       const res5 = mkRes()
-      await requestHandler(mkReq('/api/users', 'POST', ''), res5)
+      await requestHandler(mkReq('/api/users', 'POST', {}, ''), res5)
       expect(res5.writeHead).toHaveBeenCalledWith(400, expect.anything())
     } finally {
       delete _require.cache[resolvedDb]
@@ -81,25 +66,13 @@ describe('server.js', () => {
   it('rejects invalid pagination params with 400', async () => {
     const s = save('START_SERVER', 'PORT', 'REDIS_URL', 'DB_PATH')
     setEnv({ START_SERVER: 'false', PORT: '0', REDIS_URL: '', DB_PATH: path.join(tmpDir, 'srv-pag.db') })
-    const mockDb = {
-      getDb: () => ({ prepare: () => ({ all: () => [], get: () => null, run: () => {} }), exec: () => {} }),
-      getWrappedDb: () => ({ prepare: () => ({ all: () => [], get: () => null, run: () => {} }), exec: () => {} }),
-      listAll: () => [],
-      getOne: () => null,
-      insertOne: () => null,
-      updateOne: () => null,
-      deleteOne: () => null,
-      nextId: () => 1,
-      TABLES: ['users', 'posts', 'comments', 'albums', 'photos', 'todos'],
-    }
+    const mockDb = mkDb()
     clearCjs('../../src/server/index.js', '../../src/db/index.js', '../../src/middleware/rate-limiter.js')
     const resolvedDb = _require.resolve('../../src/db/index.js')
     _require.cache[resolvedDb] = { exports: mockDb, id: resolvedDb, filename: resolvedDb, loaded: true }
     try {
       vi.resetModules()
       const { requestHandler } = await import('../../src/server/index.js')
-      const mkReq = (url) => ({ url, method: 'GET', headers: {}, socket: { remoteAddress: '::1' }, on: () => {} })
-      const mkRes = () => ({ writeHead: vi.fn(), end: vi.fn(), setHeader: vi.fn(), writableEnded: false })
 
       const badParams = ['_page=abc', '_limit=-1', '_start=NaN', '_end=1.5']
       for (const param of badParams) {
@@ -120,25 +93,13 @@ describe('server.js', () => {
   it('returns 400 for non-numeric ID in route', async () => {
     const s = save('START_SERVER', 'PORT', 'REDIS_URL', 'DB_PATH')
     setEnv({ START_SERVER: 'false', PORT: '0', REDIS_URL: '', DB_PATH: path.join(tmpDir, 'srv-id.db') })
-    const mockDb = {
-      getDb: () => ({ prepare: () => ({ all: () => [], get: () => null, run: () => {} }), exec: () => {} }),
-      getWrappedDb: () => ({ prepare: () => ({ all: () => [], get: () => null, run: () => {} }), exec: () => {} }),
-      listAll: () => [],
-      getOne: () => null,
-      insertOne: () => null,
-      updateOne: () => null,
-      deleteOne: () => null,
-      nextId: () => 1,
-      TABLES: ['users', 'posts', 'comments', 'albums', 'photos', 'todos'],
-    }
+    const mockDb = mkDb()
     clearCjs('../../src/server/index.js', '../../src/db/index.js', '../../src/middleware/rate-limiter.js')
     const resolvedDb = _require.resolve('../../src/db/index.js')
     _require.cache[resolvedDb] = { exports: mockDb, id: resolvedDb, filename: resolvedDb, loaded: true }
     try {
       vi.resetModules()
       const { requestHandler } = await import('../../src/server/index.js')
-      const mkReq = (url) => ({ url, method: 'GET', headers: {}, socket: { remoteAddress: '::1' }, on: () => {} })
-      const mkRes = () => ({ writeHead: vi.fn(), end: vi.fn(), setHeader: vi.fn(), writableEnded: false })
 
       const res = mkRes()
       await requestHandler(mkReq('/api/users/abc'), res)
@@ -172,29 +133,12 @@ describe('server.js', () => {
     const s = save('START_SERVER', 'REDIS_URL', 'DB_PATH')
     setEnv({ START_SERVER: 'false', REDIS_URL: '', DB_PATH: path.join(tmpDir, 'srv-redis-banner.db') })
 
-    const mockDb = {
-      getDb: () => ({ prepare: () => ({ all: () => [], get: () => null, run: () => {} }), exec: () => {} }),
-      getWrappedDb: () => ({ prepare: () => ({ all: () => [], get: () => null, run: () => {} }), exec: () => {} }),
-      listAll: () => [],
-      getOne: () => null,
-      insertOne: () => null,
-      updateOne: () => null,
-      deleteOne: () => null,
-      nextId: () => 1,
-      TABLES: ['users', 'posts', 'comments', 'albums', 'photos', 'todos'],
-    }
+    const mockDb = mkDb()
 
     const resolvedRedis = _require.resolve('../../src/redis/index.js')
     const resolvedDb = _require.resolve('../../src/db/index.js')
 
-    const mockClient = {
-      connect: vi.fn().mockResolvedValue(),
-      ping: vi.fn().mockResolvedValue(),
-      connected: true,
-      quit: vi.fn().mockResolvedValue(),
-      send: vi.fn().mockResolvedValue(),
-    }
-    const mockRedisClass = function() { return mockClient }
+    const { mockRedisClass } = mkRedis({ connected: true })
 
     const origRedisCache = _require.cache[resolvedRedis]
     const origDbCache = _require.cache[resolvedDb]
@@ -249,8 +193,7 @@ describe('server.js', () => {
       { key: 'REDIS_PASSWORD', value: 'mockpassword', description: 'Redis password', updated_at: '2025-01-01' },
     ]
 
-    const mockDb = {
-      getDb: () => ({ prepare: () => ({ all: () => [], get: () => null, run: () => {} }), exec: () => {} }),
+    const mockDb = mkDb({
       getWrappedDb: () => ({
         prepare: (sql) => {
           if (sql.includes('SELECT value FROM settings')) {
@@ -267,18 +210,13 @@ describe('server.js', () => {
         exec: () => {},
       }),
       listAll: () => settingsTable,
-      getOne: () => null,
-      insertOne: () => null,
-      updateOne: () => null,
-      deleteOne: () => null,
-      nextId: () => 1,
       TABLES: ['users', 'posts', 'comments', 'albums', 'photos', 'todos', 'settings'],
-    }
+    })
 
     const resolvedDb = _require.resolve('../../src/db/index.js')
     const resolvedRedis = _require.resolve('../../src/redis/index.js')
     const resolvedSeed = _require.resolve('../../src/db/seed.js')
-    const mockRedisClass = function() { return { connect: vi.fn().mockResolvedValue(), ping: vi.fn().mockResolvedValue(), connected: false, quit: vi.fn().mockResolvedValue() } }
+    const { mockRedisClass } = mkRedis()
 
     const origDbCache = _require.cache[resolvedDb]
     const origRedisCache = _require.cache[resolvedRedis]
@@ -296,15 +234,6 @@ describe('server.js', () => {
       clearCjs('../../src/server/index.js', '../../src/middleware/rate-limiter.js', '../../src/config/index.js', '../../src/config/load-env.js')
       vi.resetModules()
       const { requestHandler } = await import('../../src/server/index.js')
-      const mkReq = (url, method, headers = {}, body) => ({
-        url, method, headers: { ...headers }, socket: { remoteAddress: '::1' },
-        destroy: () => {},
-        on: (evt, cb) => {
-          if (evt === 'data' && body) cb(body)
-          if (evt === 'end') queueMicrotask(() => cb())
-        },
-      })
-      const mkRes = () => ({ writeHead: vi.fn(), end: vi.fn(), setHeader: vi.fn(), writableEnded: false })
 
       const res0 = mkRes()
       await requestHandler(mkReq('/api/admin/settings', 'GET'), res0)
@@ -363,8 +292,17 @@ describe('server.js', () => {
       expect(res9.writeHead).toHaveBeenCalledWith(400, expect.anything())
 
       const resReset = mkRes()
-      await requestHandler(mkReq('/api/admin/reset-database', 'POST', { authorization: 'Bearer secret' }), resReset)
+      await requestHandler(mkReq('/api/admin/reset-database', 'POST', { authorization: 'Bearer secret' }, JSON.stringify({ confirm: true })), resReset)
       expect(resReset.writeHead).toHaveBeenCalledWith(200, expect.anything())
+
+      const resResetNoConfirm = mkRes()
+      await requestHandler(mkReq('/api/admin/reset-database', 'POST', { authorization: 'Bearer secret' }), resResetNoConfirm)
+      expect(resResetNoConfirm.writeHead).toHaveBeenCalledWith(400, expect.anything())
+
+      // malformed JSON body → readBodySafe returns null → early return from handleAdminResetDatabase
+      const resMalformed = mkRes()
+      await requestHandler(mkReq('/api/admin/reset-database', 'POST', { authorization: 'Bearer secret' }, 'not json'), resMalformed)
+      expect(resMalformed.writeHead).toHaveBeenCalledWith(400, expect.anything())
 
       argon2Mock.verify = vi.fn().mockRejectedValue(new Error('verify fail'))
       const resThrow = mkRes()
@@ -392,29 +330,12 @@ describe('server.js', () => {
     const s = save('START_SERVER', 'PORT', 'REDIS_URL', 'DB_PATH')
     setEnv({ START_SERVER: 'false', PORT: '0', REDIS_URL: '', DB_PATH: path.join(tmpDir, 'srv-redis.db') })
 
-    const mockDb = {
-      getDb: () => ({ prepare: () => ({ all: () => [], get: () => null, run: () => {} }), exec: () => {} }),
-      getWrappedDb: () => ({ prepare: () => ({ all: () => [], get: () => null, run: () => {} }), exec: () => {} }),
-      listAll: () => [],
-      getOne: () => null,
-      insertOne: () => null,
-      updateOne: () => null,
-      deleteOne: () => null,
-      nextId: () => 1,
-      TABLES: ['users', 'posts', 'comments', 'albums', 'photos', 'todos'],
-    }
+    const mockDb = mkDb()
 
     const resolvedRedis = _require.resolve('../../src/redis/index.js')
     const resolvedDb = _require.resolve('../../src/db/index.js')
 
-    const mockClient = {
-      connect: vi.fn().mockResolvedValue(),
-      ping: vi.fn().mockResolvedValue(),
-      connected: true,
-      quit: vi.fn().mockResolvedValue(),
-      send: vi.fn().mockResolvedValue(),
-    }
-    const mockRedisClass = function() { return mockClient }
+    const { mockRedisClass } = mkRedis({ connected: true })
 
     const origRedisCache = _require.cache[resolvedRedis]
     const origDbCache = _require.cache[resolvedDb]
@@ -463,17 +384,11 @@ describe('server.js', () => {
     clearCjs('../../src/server/index.js', '../../src/middleware/rate-limiter.js', '../../src/redis/index.js')
     vi.resetModules()
 
-    const mockClient = {
-      connect: vi.fn().mockResolvedValue(),
-      ping: vi.fn().mockResolvedValue(),
-      connected: false,
-      quit: vi.fn().mockResolvedValue(),
-      send: vi.fn().mockResolvedValue(),
-    }
+    const { mockClient, mockRedisClass } = mkRedis()
     const resolvedRedis = _require.resolve('../../src/redis/index.js')
     const origRedisCache = _require.cache[resolvedRedis]
     _require.cache[resolvedRedis] = {
-      exports: function() { return mockClient },
+      exports: mockRedisClass,
       id: resolvedRedis, filename: resolvedRedis, loaded: true,
     }
 
@@ -519,8 +434,7 @@ describe('server.js', () => {
       { key: 'ADMIN_KEY', value: '$argon2id$v=19$m=65536,t=3,p=4$mockedhash', description: 'Admin key', updated_at: '2025-01-01' },
     ]
 
-    const mockDb = {
-      getDb: () => ({ prepare: () => ({ all: () => [], get: () => null, run: () => {} }), exec: () => {} }),
+    const mockDb = mkDb({
       getWrappedDb: () => ({
         prepare: (sql) => {
           if (sql.includes('SELECT value FROM settings')) return { get: () => settingsTable[0] }
@@ -529,15 +443,12 @@ describe('server.js', () => {
         exec: () => {},
       }),
       listAll: () => settingsTable,
-      getOne: () => null, insertOne: () => null, updateOne: () => null,
-      deleteOne: () => null, nextId: () => 1,
       TABLES: ['users', 'posts', 'comments', 'albums', 'photos', 'todos', 'settings'],
-    }
+    })
 
     const resolvedDb = _require.resolve('../../src/db/index.js')
     const resolvedRedis = _require.resolve('../../src/redis/index.js')
-    const mockRedisClass = function() { return { connect: vi.fn().mockResolvedValue(), ping: vi.fn().mockResolvedValue(), connected: false, quit: vi.fn().mockResolvedValue() } }
-
+    const { mockRedisClass } = mkRedis()
     const origDbCache = _require.cache[resolvedDb]
     const origRedisCache = _require.cache[resolvedRedis]
     _require.cache[resolvedDb] = { exports: mockDb, id: resolvedDb, filename: resolvedDb, loaded: true }
@@ -547,29 +458,24 @@ describe('server.js', () => {
       clearCjs('../../src/server/index.js', '../../src/middleware/rate-limiter.js')
       vi.resetModules()
       const { requestHandler } = await import('../../src/server/index.js')
-      const mkReq = (headers = {}) => ({
-        url: '/api/admin/settings', method: 'GET', headers,
-        socket: { remoteAddress: '::1' }, on: () => {},
-      })
-      const mkRes = () => ({ writeHead: vi.fn(), end: vi.fn(), setHeader: vi.fn(), writableEnded: false })
 
       const res1 = mkRes()
-      await requestHandler(mkReq({ authorization: 'Bearer secret' }), res1)
+      await requestHandler(mkReq('/api/admin/settings', 'GET', { authorization: 'Bearer secret' }), res1)
       expect(res1.writeHead).toHaveBeenCalledWith(200, expect.anything())
       const firstCalls = verifySpy.mock.calls.length
 
       const res2 = mkRes()
-      await requestHandler(mkReq({ authorization: 'Bearer secret' }), res2)
+      await requestHandler(mkReq('/api/admin/settings', 'GET', { authorization: 'Bearer secret' }), res2)
       expect(res2.writeHead).toHaveBeenCalledWith(200, expect.anything())
       expect(verifySpy.mock.calls.length).toBe(firstCalls)
 
       const res3 = mkRes()
-      await requestHandler(mkReq({ authorization: 'Bearer wrong' }), res3)
+      await requestHandler(mkReq('/api/admin/settings', 'GET', { authorization: 'Bearer wrong' }), res3)
       expect(res3.writeHead).toHaveBeenCalledWith(401, expect.anything())
       expect(verifySpy.mock.calls.length).toBe(firstCalls + 1)
 
       const res4 = mkRes()
-      await requestHandler(mkReq({ authorization: 'Bearer wrong' }), res4)
+      await requestHandler(mkReq('/api/admin/settings', 'GET', { authorization: 'Bearer wrong' }), res4)
       expect(res4.writeHead).toHaveBeenCalledWith(401, expect.anything())
       expect(verifySpy.mock.calls.length).toBe(firstCalls + 1)
     } finally {
@@ -593,8 +499,7 @@ describe('server.js', () => {
     arModule.verify = vi.fn().mockResolvedValue(true)
     arModule.hash = vi.fn().mockResolvedValue('$argon2id$mockhash')
 
-    const mockDbThrows = {
-      getDb: () => ({ prepare: () => ({ all: () => [], get: () => null, run: () => {} }), exec: () => {} }),
+    const mockDbThrows = mkDb({
       getWrappedDb: () => ({
         prepare: (sql) => {
           if (sql.includes('SELECT value FROM settings')) return { get: () => ({ value: '$argon2id$mockhash' }) }
@@ -603,15 +508,13 @@ describe('server.js', () => {
         exec: () => {},
       }),
       listAll: () => { throw new Error('unexpected db error') },
-      getOne: () => null, insertOne: () => null, updateOne: () => null,
-      deleteOne: () => null, nextId: () => 1,
       TABLES: ['users', 'posts', 'comments', 'albums', 'photos', 'todos', 'settings'],
-    }
+    })
 
     const resolvedDb = _require.resolve('../../src/db/index.js')
     const resolvedRedis = _require.resolve('../../src/redis/index.js')
     const resolvedSeed = _require.resolve('../../src/db/seed.js')
-    const mockRedisClass = function() { return { connect: vi.fn().mockResolvedValue(), ping: vi.fn().mockResolvedValue(), connected: false, quit: vi.fn().mockResolvedValue() } }
+    const { mockRedisClass } = mkRedis()
 
     const origDbCache = _require.cache[resolvedDb]
     const origRedisCache = _require.cache[resolvedRedis]
@@ -624,14 +527,9 @@ describe('server.js', () => {
       clearCjs('../../src/server/index.js', '../../src/middleware/rate-limiter.js')
       vi.resetModules()
       const { requestHandler } = await import('../../src/server/index.js')
-      const mkReq = (headers = {}) => ({
-        url: '/api/admin/settings', method: 'GET', headers,
-        socket: { remoteAddress: '::1' }, on: () => {},
-      })
-      const mkRes = () => ({ writeHead: vi.fn(), end: vi.fn(), setHeader: vi.fn(), writableEnded: false })
 
       const res = mkRes()
-      await requestHandler(mkReq({ authorization: 'Bearer secret' }), res)
+      await requestHandler(mkReq('/api/admin/settings', 'GET', { authorization: 'Bearer secret' }), res)
       expect(res.writeHead).toHaveBeenCalledWith(500, expect.anything())
     } finally {
       arModule.verify = origArVerify
@@ -664,19 +562,16 @@ describe('server.js', () => {
       },
       exec: vi.fn(),
     }
-    const mockDbSeedFail = {
-      getDb: () => ({ prepare: () => ({ all: () => [], get: () => null, run: () => {} }), exec: () => {} }),
+    const mockDbSeedFail = mkDb({
       getWrappedDb: () => wrappedDb,
       listAll: () => [{ key: 'foo', value: 'bar' }],
-      getOne: () => null, insertOne: () => null, updateOne: () => null,
-      deleteOne: () => null, nextId: () => 1,
       TABLES: ['users', 'posts', 'comments', 'albums', 'photos', 'todos', 'settings'],
-    }
+    })
 
     const resolvedDb = _require.resolve('../../src/db/index.js')
     const resolvedRedis = _require.resolve('../../src/redis/index.js')
     const resolvedSeed = _require.resolve('../../src/db/seed.js')
-    const mockRedisClass = function() { return { connect: vi.fn().mockResolvedValue(), ping: vi.fn().mockResolvedValue(), connected: false, quit: vi.fn().mockResolvedValue() } }
+    const { mockRedisClass } = mkRedis()
 
     const origDbCache = _require.cache[resolvedDb]
     const origRedisCache = _require.cache[resolvedRedis]
@@ -689,15 +584,9 @@ describe('server.js', () => {
       clearCjs('../../src/server/index.js', '../../src/middleware/rate-limiter.js')
       vi.resetModules()
       const { requestHandler } = await import('../../src/server/index.js')
-      const mkReq = (headers = {}, body) => ({
-        url: '/api/admin/reset-database', method: 'POST', headers,
-        socket: { remoteAddress: '::1' }, on: () => {},
-        body: body ? JSON.stringify(body) : '',
-      })
-      const mkRes = () => ({ writeHead: vi.fn(), end: vi.fn(), setHeader: vi.fn(), writableEnded: false })
 
       const res = mkRes()
-      await requestHandler(mkReq({ authorization: 'Bearer secret', 'content-type': 'application/json' }), res)
+      await requestHandler(mkReq('/api/admin/reset-database', 'POST', { authorization: 'Bearer secret', 'content-type': 'application/json' }, JSON.stringify({ confirm: true })), res)
       expect(res.writeHead).toHaveBeenCalledWith(500, expect.anything())
       expect(mockDbSeedFail.getWrappedDb().exec).toHaveBeenCalledWith('ROLLBACK')
     } finally {
@@ -727,8 +616,7 @@ describe('server.js', () => {
       { key: 'ADMIN_KEY', value: '$argon2id$v=19$m=65536,t=3,p=4$mockedhash', description: 'Admin key', updated_at: '2025-01-01' },
     ]
 
-    const mockDb = {
-      getDb: () => ({ prepare: () => ({ all: () => [], get: () => null, run: () => {} }), exec: () => {} }),
+    const mockDb = mkDb({
       getWrappedDb: () => ({
         prepare: (sql) => {
           if (sql.includes('SELECT value FROM settings')) return { get: () => settingsTable[0] }
@@ -737,14 +625,12 @@ describe('server.js', () => {
         exec: () => {},
       }),
       listAll: () => settingsTable,
-      getOne: () => null, insertOne: () => null, updateOne: () => null,
-      deleteOne: () => null, nextId: () => 1,
       TABLES: ['users', 'posts', 'comments', 'albums', 'photos', 'todos', 'settings'],
-    }
+    })
 
     const resolvedDb = _require.resolve('../../src/db/index.js')
     const resolvedRedis = _require.resolve('../../src/redis/index.js')
-    const mockRedisClass = function() { return { connect: vi.fn().mockResolvedValue(), ping: vi.fn().mockResolvedValue(), connected: false, quit: vi.fn().mockResolvedValue() } }
+    const { mockRedisClass } = mkRedis()
 
     const origDbCache = _require.cache[resolvedDb]
     const origRedisCache = _require.cache[resolvedRedis]
@@ -755,19 +641,14 @@ describe('server.js', () => {
       clearCjs('../../src/server/index.js', '../../src/middleware/rate-limiter.js')
       vi.resetModules()
       const { requestHandler } = await import('../../src/server/index.js')
-      const mkReq = (headers = {}) => ({
-        url: '/api/admin/settings', method: 'GET', headers,
-        socket: { remoteAddress: '::1' }, on: () => {},
-      })
-      const mkRes = () => ({ writeHead: vi.fn(), end: vi.fn(), setHeader: vi.fn(), writableEnded: false })
 
       const res1 = mkRes()
-      await requestHandler(mkReq({ authorization: 'Bearer throw' }), res1)
+      await requestHandler(mkReq('/api/admin/settings', 'GET', { authorization: 'Bearer throw' }), res1)
       expect(res1.writeHead).toHaveBeenCalledWith(401, expect.anything())
       expect(verifySpy).toHaveBeenCalledTimes(1)
 
       const res2 = mkRes()
-      await requestHandler(mkReq({ authorization: 'Bearer throw' }), res2)
+      await requestHandler(mkReq('/api/admin/settings', 'GET', { authorization: 'Bearer throw' }), res2)
       expect(res2.writeHead).toHaveBeenCalledWith(401, expect.anything())
       expect(verifySpy).toHaveBeenCalledTimes(1)
     } finally {

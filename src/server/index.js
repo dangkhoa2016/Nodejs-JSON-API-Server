@@ -255,9 +255,6 @@ async function checkAdminAuth(req) {
 
 async function handleAdmin(req, res, pathname, method) {
   if (!(await checkAdminAuth(req))) {
-    /* v8 ignore start */ if (!adminKey) {
-      return json(res, 401, { error: 'Admin not configured', message: 'ADMIN_KEY environment variable is not set' });
-    } /* v8 ignore stop */
     return json(res, 401, { error: 'Unauthorized' });
   }
 
@@ -329,6 +326,11 @@ async function withResetLock(fn) {
 }
 
 async function handleAdminResetDatabase(req, res) {
+  const body = await readBodySafe(req, res);
+  if (body === null) return;
+  if (body.confirm !== true) {
+    return badRequest(res, 'Reset requires confirm: true in request body');
+  }
   await withResetLock(async () => {
     const d = db.getWrappedDb();
     d.exec('BEGIN');
