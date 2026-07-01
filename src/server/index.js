@@ -3,7 +3,7 @@
 const http = require('http');
 
 const { port, redisOpts, rateLimitMax, rateLimitEnabled,
-  rateLimitWindowMs, rateLimitWindowSec, maxBodySize, adminKey } = require('../config');
+  rateLimitWindowMs, rateLimitWindowSec, maxBodySize, adminKey, sensitiveKeys } = require('../config');
 const argon2 = require('argon2');
 const RedisClient = require('../redis');
 const { createRateLimiter } = require('../middleware/rate-limiter');
@@ -261,10 +261,8 @@ async function handleAdmin(req, res, pathname, method) {
     return json(res, 401, { error: 'Unauthorized' });
   }
 
-  const SENSITIVE_KEYS = ['REDIS_PASSWORD', 'ADMIN_KEY'];
-
   if (pathname === '/api/admin/settings' && method === 'GET') {
-    const rows = db.listAll('settings').map((r) => SENSITIVE_KEYS.includes(r.key) ? { ...r, value: '***' } : r);
+    const rows = db.listAll('settings').map((r) => sensitiveKeys.includes(r.key) ? { ...r, value: '***' } : r);
     return json(res, 200, rows);
   }
 

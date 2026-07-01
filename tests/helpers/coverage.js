@@ -29,7 +29,7 @@ export function setEnv(overrides) {
 }
 
 export function configMockFactory() {
-  const METHODS = ['port', 'dbPath', 'dbDebugSql', 'redisOpts', 'rateLimitEnabled', 'rateLimitMax', 'rateLimitWindowMs', 'rateLimitWindowSec', 'adminKey', 'maxBodySize', 'defaultPageSize']
+  const METHODS = ['port', 'dbPath', 'dbDebugSql', 'redisOpts', 'rateLimitEnabled', 'rateLimitMax', 'rateLimitWindowMs', 'rateLimitWindowSec', 'adminKey', 'maxBodySize', 'defaultPageSize', 'sensitiveKeys']
   const cfg = {
     getPort: () => parseInt(process.env.PORT || '3000', 10),
     getDbPath: () => process.env.DB_PATH || process.cwd() + '/storage/data.db',
@@ -53,6 +53,7 @@ export function configMockFactory() {
       return isNaN(raw) || raw < 1 ? 1048576 : raw
     },
     getDefaultPageSize: () => parseInt(process.env.DEFAULT_PAGE_SIZE || '10', 10),
+    getSensitiveKeys: () => ['REDIS_PASSWORD', 'ADMIN_KEY'],
   }
   const getMethod = (prop) => cfg['get' + prop[0].toUpperCase() + prop.slice(1)]
   return new Proxy(cfg, {

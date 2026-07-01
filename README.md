@@ -392,7 +392,7 @@ See [tests/README.md](tests/README.md) for full documentation.
 
 - **Minimal runtime dependencies** — only `argon2` for admin password hashing; everything else uses Node.js built-in modules (`http`, `url`, `fs`, `path`, `net`, `node:sqlite`). `dotenv` is a dev dependency.
 - **Pure RESP protocol** — the Redis client in `src/redis/index.js` implements the Redis serialization protocol over raw TCP sockets without any third-party library. Supports `AUTH` password authentication and `REDIS_URL` connection strings.
-- **Centralized config** — all environment variables are read in `src/config/index.js` and exported as camelCase (`port`, `dbPath`, `redisOpts`, `rateLimitMax`, `dbDebugSql`, etc.) for use across the codebase.
+- **Centralized config** — all environment variables are read in `src/config/index.js` and exported as camelCase (`port`, `dbPath`, `redisOpts`, `rateLimitMax`, `dbDebugSql`, `sensitiveKeys`, etc.) for use across the codebase.
 - **Rate limiter** — \`src/middleware/rate-limiter.js\` features a circuit breaker for Redis failures, CIDR-based trusted proxy IP extraction, escalating block durations (5m → 20m → 1h), atomic Redis Lua scripts, and an in-memory fallback with LRU eviction. \`createRateLimiter()\` accepts options directly instead of reading config lazily.
 - **Testable seed script** — `src/db/seed.js` accepts `database` and `fetch` parameters via dependency injection, enabling full unit testing without mocking `require()`.
 - **SQL query logging** — `src/db/sql-logger.js` exports `wrapDb`/`wrapStmt` Proxy wrappers that log `exec`, `prepare`, `run`, `get`, and `all` calls to stderr. `src/db/index.js` uses them via `getWrappedDb()` when `DEBUG_SQL=true`.

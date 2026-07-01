@@ -35,6 +35,8 @@ const MAX_BODY_SIZE = isNaN(parsedMaxBodySize) || parsedMaxBodySize < 1 ? DEFAUL
 const DEFAULT_PAGE_SIZE = parseInt(process.env.DEFAULT_PAGE_SIZE || '10', 10);
 /* v8 ignore stop */
 
+const SENSITIVE_KEYS = ['REDIS_PASSWORD', 'ADMIN_KEY'];
+
 module.exports = {
   port: PORT,
   dbPath: DB_PATH,
@@ -47,4 +49,5 @@ module.exports = {
   maxBodySize: MAX_BODY_SIZE,
   defaultPageSize: DEFAULT_PAGE_SIZE,
   adminKey: ADMIN_KEY,
+  sensitiveKeys: SENSITIVE_KEYS,
 };

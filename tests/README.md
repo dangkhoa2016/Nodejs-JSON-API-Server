@@ -35,7 +35,7 @@ tests/
     integration.test.js              # API integration tests — real HTTP + SQLite (77 tests)
     server.test.js                   # Server request handler, admin auth, graceful shutdown (13 tests)
   helpers/
-    coverage.js                      # Shared test utilities (save/restore/setEnv/clearCjs)
+    coverage.js                      # Shared test utilities (save/restore/setEnv/clearCjs/configMockFactory)
     index.js                         # startServer / stopServer / request utilities
     seed.js                          # Standalone script to create & seed temp DB
     seed-settings-coverage.test.js   # Seed-settings.js V8 coverage (4 tests)
