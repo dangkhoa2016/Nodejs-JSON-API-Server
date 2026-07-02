@@ -31,7 +31,7 @@ describe('server.js', () => {
       listAll: () => { throw new Error('boom') },
       insertOne: () => { throw new Error('duplicate') },
     })
-    clearCjs('../../src/server/index.js', '../../src/db/index.js', '../../src/middleware/rate-limiter.js')
+    clearCjs('../../src/server/index.js', '../../src/server/route.js', '../../src/db/index.js', '../../src/middleware/rate-limiter.js')
     const resolvedDb = _require.resolve('../../src/db/index.js')
     _require.cache[resolvedDb] = { exports: mockDb, id: resolvedDb, filename: resolvedDb, loaded: true }
     try {
@@ -67,7 +67,7 @@ describe('server.js', () => {
     const s = save('START_SERVER', 'PORT', 'REDIS_URL', 'DB_PATH')
     setEnv({ START_SERVER: 'false', PORT: '0', REDIS_URL: '', DB_PATH: path.join(tmpDir, 'srv-pag.db') })
     const mockDb = mkDb()
-    clearCjs('../../src/server/index.js', '../../src/db/index.js', '../../src/middleware/rate-limiter.js')
+    clearCjs('../../src/server/index.js', '../../src/server/route.js', '../../src/db/index.js', '../../src/middleware/rate-limiter.js')
     const resolvedDb = _require.resolve('../../src/db/index.js')
     _require.cache[resolvedDb] = { exports: mockDb, id: resolvedDb, filename: resolvedDb, loaded: true }
     try {
@@ -94,7 +94,7 @@ describe('server.js', () => {
     const s = save('START_SERVER', 'PORT', 'REDIS_URL', 'DB_PATH')
     setEnv({ START_SERVER: 'false', PORT: '0', REDIS_URL: '', DB_PATH: path.join(tmpDir, 'srv-id.db') })
     const mockDb = mkDb()
-    clearCjs('../../src/server/index.js', '../../src/db/index.js', '../../src/middleware/rate-limiter.js')
+    clearCjs('../../src/server/index.js', '../../src/server/route.js', '../../src/db/index.js', '../../src/middleware/rate-limiter.js')
     const resolvedDb = _require.resolve('../../src/db/index.js')
     _require.cache[resolvedDb] = { exports: mockDb, id: resolvedDb, filename: resolvedDb, loaded: true }
     try {
@@ -154,7 +154,7 @@ describe('server.js', () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
 
     try {
-      clearCjs('../../src/server/index.js', '../../src/middleware/rate-limiter.js')
+      clearCjs('../../src/server/index.js', '../../src/server/route.js', '../../src/middleware/rate-limiter.js')
       vi.resetModules()
       const { printLog } = await import('../../src/server/index.js')
       printLog()
@@ -165,7 +165,7 @@ describe('server.js', () => {
       else delete _require.cache[resolvedRedis]
       if (origDbCache) _require.cache[resolvedDb] = origDbCache
       else delete _require.cache[resolvedDb]
-      clearCjs('../../src/server/index.js', '../../src/middleware/rate-limiter.js')
+      clearCjs('../../src/server/index.js', '../../src/server/route.js', '../../src/middleware/rate-limiter.js')
     }
     restore(s)
   })
@@ -231,7 +231,7 @@ describe('server.js', () => {
     }
 
     try {
-      clearCjs('../../src/server/index.js', '../../src/middleware/rate-limiter.js', '../../src/config/index.js', '../../src/config/load-env.js')
+      clearCjs('../../src/server/index.js', '../../src/server/route.js', '../../src/middleware/rate-limiter.js', '../../src/config/index.js', '../../src/config/load-env.js')
       vi.resetModules()
       const { requestHandler } = await import('../../src/server/index.js')
 
@@ -321,7 +321,7 @@ describe('server.js', () => {
       else delete _require.cache[resolvedRedis]
       if (origSeedCache) _require.cache[resolvedSeed] = origSeedCache
       else delete _require.cache[resolvedSeed]
-      clearCjs('../../src/server/index.js', '../../src/middleware/rate-limiter.js')
+      clearCjs('../../src/server/index.js', '../../src/server/route.js', '../../src/middleware/rate-limiter.js')
     }
     restore(s)
   })
@@ -352,7 +352,7 @@ describe('server.js', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
 
     try {
-      clearCjs('../../src/server/index.js', '../../src/middleware/rate-limiter.js')
+      clearCjs('../../src/server/index.js', '../../src/server/route.js', '../../src/middleware/rate-limiter.js')
       vi.resetModules()
       await import('../../src/server/index.js')
       expect(logSpy).toHaveBeenCalledWith('[Redis] Connected ✓')
@@ -363,7 +363,7 @@ describe('server.js', () => {
       else delete _require.cache[resolvedRedis]
       if (origDbCache) _require.cache[resolvedDb] = origDbCache
       else delete _require.cache[resolvedDb]
-      clearCjs('../../src/server/index.js', '../../src/middleware/rate-limiter.js')
+      clearCjs('../../src/server/index.js', '../../src/server/route.js', '../../src/middleware/rate-limiter.js')
     }
     restore(s)
   })
@@ -381,7 +381,7 @@ describe('server.js', () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
     const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {})
 
-    clearCjs('../../src/server/index.js', '../../src/middleware/rate-limiter.js', '../../src/redis/index.js')
+    clearCjs('../../src/server/index.js', '../../src/server/route.js', '../../src/middleware/rate-limiter.js', '../../src/redis/index.js')
     vi.resetModules()
 
     const { mockClient, mockRedisClass } = mkRedis()
@@ -416,7 +416,7 @@ describe('server.js', () => {
       exitSpy.mockRestore()
       if (origRedisCache) _require.cache[resolvedRedis] = origRedisCache
       else delete _require.cache[resolvedRedis]
-      clearCjs('../../src/server/index.js', '../../src/middleware/rate-limiter.js')
+      clearCjs('../../src/server/index.js', '../../src/server/route.js', '../../src/middleware/rate-limiter.js')
       for (const fn of oldSigint) process.on('SIGINT', fn)
       for (const fn of oldSigterm) process.on('SIGTERM', fn)
     }
@@ -455,7 +455,7 @@ describe('server.js', () => {
     _require.cache[resolvedRedis] = { exports: mockRedisClass, id: resolvedRedis, filename: resolvedRedis, loaded: true }
 
     try {
-      clearCjs('../../src/server/index.js', '../../src/middleware/rate-limiter.js')
+      clearCjs('../../src/server/index.js', '../../src/server/route.js', '../../src/middleware/rate-limiter.js')
       vi.resetModules()
       const { requestHandler } = await import('../../src/server/index.js')
 
@@ -484,7 +484,7 @@ describe('server.js', () => {
       else delete _require.cache[resolvedDb]
       if (origRedisCache) _require.cache[resolvedRedis] = origRedisCache
       else delete _require.cache[resolvedRedis]
-      clearCjs('../../src/server/index.js', '../../src/middleware/rate-limiter.js')
+      clearCjs('../../src/server/index.js', '../../src/server/route.js', '../../src/middleware/rate-limiter.js')
     }
     restore(s)
   })
@@ -524,7 +524,7 @@ describe('server.js', () => {
     _require.cache[resolvedSeed] = { exports: { seed: vi.fn().mockResolvedValue() }, id: resolvedSeed, filename: resolvedSeed, loaded: true }
 
     try {
-      clearCjs('../../src/server/index.js', '../../src/middleware/rate-limiter.js')
+      clearCjs('../../src/server/index.js', '../../src/server/route.js', '../../src/middleware/rate-limiter.js')
       vi.resetModules()
       const { requestHandler } = await import('../../src/server/index.js')
 
@@ -540,7 +540,7 @@ describe('server.js', () => {
       else delete _require.cache[resolvedRedis]
       if (origSeedCache) _require.cache[resolvedSeed] = origSeedCache
       else delete _require.cache[resolvedSeed]
-      clearCjs('../../src/server/index.js', '../../src/middleware/rate-limiter.js')
+      clearCjs('../../src/server/index.js', '../../src/server/route.js', '../../src/middleware/rate-limiter.js')
     }
     restore(s)
   })
@@ -581,7 +581,7 @@ describe('server.js', () => {
     _require.cache[resolvedSeed] = { exports: { seed: vi.fn().mockRejectedValue(new Error('seed fail')) }, id: resolvedSeed, filename: resolvedSeed, loaded: true }
 
     try {
-      clearCjs('../../src/server/index.js', '../../src/middleware/rate-limiter.js')
+      clearCjs('../../src/server/index.js', '../../src/server/route.js', '../../src/middleware/rate-limiter.js')
       vi.resetModules()
       const { requestHandler } = await import('../../src/server/index.js')
 
@@ -597,7 +597,7 @@ describe('server.js', () => {
       if (origRedisCache) _require.cache[resolvedRedis] = origRedisCache
       else delete _require.cache[resolvedRedis]
       delete _require.cache[resolvedSeed]
-      clearCjs('../../src/server/index.js', '../../src/middleware/rate-limiter.js')
+      clearCjs('../../src/server/index.js', '../../src/server/route.js', '../../src/middleware/rate-limiter.js')
     }
     restore(s)
   })
@@ -638,7 +638,7 @@ describe('server.js', () => {
     _require.cache[resolvedRedis] = { exports: mockRedisClass, id: resolvedRedis, filename: resolvedRedis, loaded: true }
 
     try {
-      clearCjs('../../src/server/index.js', '../../src/middleware/rate-limiter.js')
+      clearCjs('../../src/server/index.js', '../../src/server/route.js', '../../src/middleware/rate-limiter.js')
       vi.resetModules()
       const { requestHandler } = await import('../../src/server/index.js')
 
@@ -657,7 +657,7 @@ describe('server.js', () => {
       else delete _require.cache[resolvedDb]
       if (origRedisCache) _require.cache[resolvedRedis] = origRedisCache
       else delete _require.cache[resolvedRedis]
-      clearCjs('../../src/server/index.js', '../../src/middleware/rate-limiter.js')
+      clearCjs('../../src/server/index.js', '../../src/server/route.js', '../../src/middleware/rate-limiter.js')
     }
     restore(s)
   })

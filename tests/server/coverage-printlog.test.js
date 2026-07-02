@@ -66,7 +66,7 @@ describe('server.js ESM coverage', () => {
     process.env.RATE_LIMIT_ENABLED = 'false'
     process.env.MAX_BODY_SIZE = '100'
 
-    clearCjs('../../src/config/index.js', '../../src/config/load-env.js')
+    clearCjs('../../src/config/index.js', '../../src/config/load-env.js', '../../src/server/route.js')
     vi.resetModules()
     const mod = await import('../../src/server/index.js')
 
@@ -96,7 +96,7 @@ describe('server.js ESM coverage', () => {
     process.env.DB_PATH = ':memory:'
     process.env.RATE_LIMIT_ENABLED = 'false'
 
-    clearCjs('../../src/config/index.js', '../../src/config/load-env.js')
+    clearCjs('../../src/config/index.js', '../../src/config/load-env.js', '../../src/server/route.js')
     vi.resetModules()
     const mod = await import('../../src/server/index.js')
 
@@ -119,7 +119,7 @@ describe('server.js ESM coverage', () => {
     process.env.START_SERVER = 'false'
     process.env.DB_PATH = ':memory:'
 
-    clearCjs('../../src/config/index.js', '../../src/config/load-env.js')
+    clearCjs('../../src/config/index.js', '../../src/config/load-env.js', '../../src/server/route.js')
     vi.resetModules()
     const mod = await import('../../src/server/index.js')
 

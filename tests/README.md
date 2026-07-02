@@ -33,7 +33,8 @@ tests/
     coverage-printlog.test.js        # Printlog and server export V8 coverage (4 tests)
     graceful-shutdown.test.js        # SIGINT/SIGTERM handler coverage (1 test)
     integration.test.js              # API integration tests — real HTTP + SQLite (77 tests)
-    server.test.js                   # Server request handler, admin auth, graceful shutdown (13 tests)
+    index.test.js                    # Server request handler, admin auth, graceful shutdown (13 tests)
+    route.test.js                    # Route parsing, favicon, health, admin auth cache (14 tests)
   helpers/
     coverage.js                      # Shared test utilities (save/restore/setEnv/clearCjs/configMockFactory)
     mock-factory.js                  # Mock factory helpers (mkDb/mkReq/mkRes/mkRedis/mkSettingsTable)
@@ -42,7 +43,7 @@ tests/
     seed-settings-coverage.test.js   # Seed-settings.js V8 coverage (4 tests)
 ```
 
-**Total: 219 tests across 13 test files.**
+**Total: 233 tests across 14 test files.**
 
 ## Test design
 
@@ -61,7 +62,8 @@ Unit tests cover every source module individually. Each module has its own test 
 | `db/index.js`                  | `tests/db/database.test.js`   | Real `node:sqlite` databases; tests pagination, search, sort, SQL injection |
 | `middleware/rate-limiter.js`   | `tests/middleware/rate-limiter.test.js` | Module imported once; mocks Redis, in-memory store; tests circuit breaker, proxy IPs, escalating blocks |
 | `redis/index.js`               | `tests/redis/redis.test.js`  | RESP encoding/parsing directly; constructor options |
-| `server/index.js`              | `tests/server/server.test.js` | `requestHandler()` with mock req/res; CJS cache injection for DB mock; tests auth caching and graceful shutdown (13 tests) |
+| `server/index.js`              | `tests/server/index.test.js`  | `requestHandler()` with mock req/res; CJS cache injection for DB mock; tests auth caching and graceful shutdown (13 tests) |
+| `server/route.js`              | `tests/server/route.test.js`  | Route parsing, favicon, null body, health endpoint, admin auth, auth cache eviction, reset-database, unknown routes |
 | `server/index.js` (ESM)        | `tests/server/coverage-printlog.test.js` | Dynamic `import()` for V8-covered printLog, startServer, 500 catch |
 | `server/index.js` (child)      | `tests/server/graceful-shutdown.test.js` | SIGINT/SIGTERM via child process (V8 coverage) |
 | `db/migrate.js`                | `tests/db/migrate.test.js`   | Real migration + corrupt DB failure path |

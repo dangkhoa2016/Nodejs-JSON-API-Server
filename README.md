@@ -280,30 +280,37 @@ json-api-server/
 │   │   └── rate-limiter.js       # Rate limiter (Redis/in-memory, circuit breaker, escalating blocks)
 │   ├── redis/
 │   │   └── index.js              # Pure-Node Redis client via RESP protocol over TCP
+│   ├── public/
+│   │   ├── favicon.ico           # Favicon (ICO format)
+│   │   ├── favicon.png           # Favicon (PNG format)
+│   │   └── license.md            # Flaticon license file
 │   └── server/
-│       └── index.js              # HTTP server, routing, middleware, handlers
+│       ├── index.js              # HTTP server, graceful shutdown, startup orchestration
+│       └── route.js              # Route parser, request handlers, admin auth, favicon
 ├── tests/
 │   ├── config/
 │   │   ├── config.test.js           # Config defaults and env var branches (9)
 │   │   └── load-env.test.js         # Load-env file loading chain and error paths (7)
 │   ├── db/
-│   │   ├── database.test.js         # Database CRUD, pagination, search, sort, SQL injection (10)
+│   │   ├── database.test.js         # Database CRUD, pagination, search, sort, SQL injection, cascade delete (11)
 │   │   ├── migrate.test.js          # Migration success and failure paths (2)
 │   │   ├── seed.test.js             # Seed with real DB + mocked deps, JSONPlaceholder fetch (5)
 │   │   └── sql-logger.test.js       # SQL query logger wrapping (5)
 │   ├── middleware/
 │   │   └── rate-limiter.test.js     # In-memory, Redis, circuit breaker, proxy IPs (54)
 │   ├── redis/
-│   │   └── redis.test.js            # RESP protocol encoding/parsing, constructor options (25)
+│   │   └── redis.test.js            # RESP protocol encoding/parsing, constructor options, eval method (27)
 │   ├── server/
 │   │   ├── coverage-printlog.test.js # Printlog and server export V8 coverage (4)
 │   │   ├── graceful-shutdown.test.js # SIGINT/SIGTERM handler coverage (1)
+│   │   ├── index.test.js            # Server request handler, admin auth, graceful shutdown (13)
 │   │   ├── integration.test.js      # API integration tests — real HTTP + SQLite (77)
-│   │   └── server.test.js           # Server request handler, admin auth, graceful shutdown (13)
+│   │   └── route.test.js            # Route parsing, favicon, health, admin auth cache (14)
 │   ├── README.md                    # Testing documentation
 │   └── helpers/
-│       ├── coverage.js              # Test-coverage utilities (save/restore/setEnv/clearCjs)
+│       ├── coverage.js              # Test-coverage utilities (save/restore/setEnv/clearCjs/configMockFactory)
 │       ├── index.js                 # startServer / stopServer / request utilities
+│       ├── mock-factory.js          # Mock factory helpers (mkDb/mkReq/mkRes/mkRedis/mkSettingsTable)
 │       └── seed.js                  # Standalone script to create & seed temp DB
 │   └── seed-settings-coverage.test.js  # Seed-settings.js V8 coverage (4)
 ├── manual/
@@ -381,7 +388,7 @@ This runs comprehensive queries to inspect row counts, column metadata, relation
 
 ## Testing
 
-Uses **vitest** with **V8 native coverage**. **218 tests across 13 test files** cover the full stack — from integration tests (real HTTP server + SQLite) to unit tests for every module.
+Uses **vitest** with **V8 native coverage**. **233 tests across 14 test files** cover the full stack — from integration tests (real HTTP server + SQLite) to unit tests for every module.
 
 ```bash
 npm test              # Run all tests once
@@ -402,10 +409,15 @@ See [tests/README.md](tests/README.md) for full documentation.
 - **SQL query logging** — `src/db/sql-logger.js` exports `wrapDb`/`wrapStmt` Proxy wrappers that log `exec`, `prepare`, `run`, `get`, and `all` calls to stderr. `src/db/index.js` uses them via `getWrappedDb()` when `DEBUG_SQL=true`.
 - **Multi-environment** — `src/config/index.js` requires `src/config/load-env.js` at module level, which chain-loads all dotenv files in priority order with `override: false` — existing `process.env` values and earlier files take precedence over later ones. Every consumer (server, migrate, seed) simply requires `src/config/index.js` and gets correct env values. In production, dotenv is skipped entirely — env vars must come from the deployment environment.
 - **SQL injection prevention** — `src/db/index.js` validates `_sort` against a whitelist of known columns and quotes identifiers with `""`; LIKE wildcards (`%`, `_`) are escaped to prevent injection through the `q` parameter
-- **Argon2 auth cache** — `src/server/index.js` caches `ADMIN_KEY` verification results in a `Map` with 5-second TTL, avoiding repeated argon2 hashing on burst admin requests
+- **Argon2 auth cache** — `src/server/route.js` caches `ADMIN_KEY` verification results in a `Map` with 5-second TTL and 1,000-entry limit, avoiding repeated argon2 hashing on burst admin requests
 - **CORS** enabled on all routes
 - **Graceful shutdown** — handles `SIGINT` and `SIGTERM` to close the server and Redis connection cleanly
 
 ## License
 
 [MIT](LICENSE) — Copyright (c) 2026 Dang Khoa &lt;i.am@dangkhoa.dev&gt;
+
+## Credits
+
+This project uses graphics from Flaticon:
+* [Sustainability stickers](https://www.flaticon.com/free-stickers/sustainability) created by [Manuel Viveros - Flaticon](https://www.flaticon.com/authors/manuel-viveros?type=sticker)

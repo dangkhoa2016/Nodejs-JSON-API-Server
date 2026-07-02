@@ -80,7 +80,7 @@ describe('seed-settings.js', () => {
     process.env.DB_PATH = dbPath
     process.env.START_SERVER = 'false'
 
-  clearCjs('../src/db/seed-settings.js', '../src/db/index.js', '../src/db/migrate.js', '../src/config/index.js', '../src/server/index.js')
+  clearCjs('../src/db/seed-settings.js', '../src/db/index.js', '../src/db/migrate.js', '../src/config/index.js', '../src/server/index.js', '../src/server/route.js')
     const { seedSettings } = _require('../src/db/seed-settings.js')
     await seedSettings()
 

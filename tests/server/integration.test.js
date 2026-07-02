@@ -32,16 +32,34 @@ describe('Health & Root', () => {
     expect(res.body.status).toBe('ok');
   });
 
+  it('GET /health/ works with trailing slash', async () => {
+    const res = await request('/health/');
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe('ok');
+  });
+
+  it('GET /api/health/ works with trailing slash', async () => {
+    const res = await request('/api/health/');
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe('ok');
+  });
+
   it('GET / returns API info', async () => {
     const res = await request('/');
     expect(res.status).toBe(200);
-    expect(res.body.message).toContain('json-api-server');
+    expect(res.body.message).toContain('JSON API Server');
     expect(res.body.version).toBe('1.0.0');
     expect(res.body.endpoints).toBeInstanceOf(Array);
   });
 
   it('GET /api works as alias', async () => {
     const res = await request('/api');
+    expect(res.status).toBe(200);
+    expect(res.body.version).toBe('1.0.0');
+  });
+
+  it('GET /api/ works with trailing slash', async () => {
+    const res = await request('/api/');
     expect(res.status).toBe(200);
     expect(res.body.version).toBe('1.0.0');
   });
@@ -145,6 +163,18 @@ describe('404 handling', () => {
     const res = await request('/api/unknown');
     expect(res.status).toBe(404);
     expect(res.body.error).toContain('Unknown route');
+  });
+
+  it('GET /users without /api prefix returns 404', async () => {
+    const res = await request('/users');
+    expect(res.status).toBe(404);
+    expect(res.body.error).toContain('Unknown route');
+  });
+
+  it('GET /api/users/ with trailing slash still works', async () => {
+    const res = await request('/api/users/');
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body)).toBe(true);
   });
 });
 
