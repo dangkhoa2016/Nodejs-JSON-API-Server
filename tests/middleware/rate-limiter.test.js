@@ -133,6 +133,41 @@ describe('Rate Limiter Middleware', () => {
       await rateLimiter(req, res, () => {});
       expect(res.setHeader).toHaveBeenCalledWith('X-RateLimit-Limit', '50');
     });
+
+    it('should expose updateConfig method', () => {
+      const rateLimiter = createRateLimiter(null, { max: 100 });
+      expect(typeof rateLimiter.updateConfig).toBe('function');
+    });
+
+    it('updateConfig should disable rate limiting at runtime', async () => {
+      const rateLimiter = createRateLimiter(null, { max: 1 });
+      const res = { setHeader: vi.fn(), writeHead: vi.fn().mockReturnThis(), end: vi.fn() };
+      const req = { path: '/test', headers: {}, socket: { remoteAddress: '127.0.0.1' } };
+      await rateLimiter(req, res, () => {});
+      res.setHeader.mockClear();
+
+      const next = vi.fn();
+      const res2 = { setHeader: vi.fn(), writeHead: vi.fn(), end: vi.fn() };
+      const req2 = { path: '/test', headers: {}, socket: { remoteAddress: '127.0.0.1' } };
+      rateLimiter.updateConfig({ enabled: false });
+      await rateLimiter(req2, res2, next);
+      expect(next).toHaveBeenCalledTimes(1);
+    });
+
+    it('updateConfig should change rate limit max at runtime', async () => {
+      const rateLimiter = createRateLimiter(null, { max: 100 });
+      const req = { path: '/test', headers: {}, socket: { remoteAddress: '127.0.0.1' } };
+      const res = { setHeader: vi.fn(), writeHead: vi.fn(), end: vi.fn() };
+      await rateLimiter(req, res, () => {});
+      expect(res.setHeader).toHaveBeenCalledWith('X-RateLimit-Limit', '100');
+
+      rateLimiter.updateConfig({ max: 1 });
+      res.setHeader.mockClear();
+      const res2 = { setHeader: vi.fn(), writeHead: vi.fn().mockReturnThis(), end: vi.fn() };
+      const req2 = { path: '/test', headers: {}, socket: { remoteAddress: '127.0.0.1' } };
+      await rateLimiter(req2, res2, () => {});
+      expect(res2.writeHead).toHaveBeenCalledWith(429, expect.any(Object));
+    });
   });
 
   describe('memFallback', () => {

@@ -26,24 +26,24 @@ tests/
     seed.test.js                     # Seed with real DB + mocked deps, JSONPlaceholder fetch (5 tests)
     sql-logger.test.js               # SQL query logger wrapping tests (5 tests)
   middleware/
-    rate-limiter.test.js             # In-memory, Redis, circuit breaker, proxy IPs (54 tests)
+    rate-limiter.test.js             # In-memory, Redis, circuit breaker, proxy IPs, updateConfig hot-swap (57 tests)
   redis/
-    redis.test.js                    # RESP protocol encoding/parsing, constructor options, eval method (27 tests)
+    redis.test.js                    # RESP protocol encoding/parsing, constructor options, eval method, reconnect (33 tests)
   server/
     coverage-printlog.test.js        # Printlog and server export V8 coverage (4 tests)
     graceful-shutdown.test.js        # SIGINT/SIGTERM handler coverage (1 test)
-    integration.test.js              # API integration tests — real HTTP + SQLite (77 tests)
+    integration.test.js              # API integration tests — real HTTP + SQLite, runtime PATCH settings (81 tests)
     index.test.js                    # Server request handler, admin auth, graceful shutdown (13 tests)
-    route.test.js                    # Route parsing, favicon, health, admin auth cache (14 tests)
+    route.test.js                    # Route parsing, favicon, health, admin auth cache, runtime config updates (18 tests)
   helpers/
     coverage.js                      # Shared test utilities (save/restore/setEnv/clearCjs/configMockFactory)
     mock-factory.js                  # Mock factory helpers (mkDb/mkReq/mkRes/mkRedis/mkSettingsTable)
     index.js                         # startServer / stopServer / request utilities
     seed.js                          # Standalone script to create & seed temp DB
-    seed-settings-coverage.test.js   # Seed-settings.js V8 coverage (4 tests)
+  seed-settings-coverage.test.js     # Seed-settings.js V8 coverage (4 tests)
 ```
 
-**Total: 233 tests across 14 test files.**
+**Total: 250 tests across 14 test files.**
 
 ## Test design
 
@@ -58,12 +58,13 @@ Unit tests cover every source module individually. Each module has its own test 
 | Module                         | Test file                    | Approach |
 |--------------------------------|------------------------------|----------|
 | `config/index.js`              | `tests/config/config.test.js` | Module re-imported with different `process.env` values |
+| `config/runtime-config.js`     | _(covered via route.test.js & integration.test.js)_ | In-memory config overrides for runtime setting updates |
 | `config/load-env.js`           | `tests/config/load-env.test.js` | Temp env dirs, mocked dotenv; tests chain, override:false, ENOENT, parse errors |
 | `db/index.js`                  | `tests/db/database.test.js`   | Real `node:sqlite` databases; tests pagination, search, sort, SQL injection |
 | `middleware/rate-limiter.js`   | `tests/middleware/rate-limiter.test.js` | Module imported once; mocks Redis, in-memory store; tests circuit breaker, proxy IPs, escalating blocks |
 | `redis/index.js`               | `tests/redis/redis.test.js`  | RESP encoding/parsing directly; constructor options |
 | `server/index.js`              | `tests/server/index.test.js`  | `requestHandler()` with mock req/res; CJS cache injection for DB mock; tests auth caching and graceful shutdown (13 tests) |
-| `server/route.js`              | `tests/server/route.test.js`  | Route parsing, favicon, null body, health endpoint, admin auth, auth cache eviction, reset-database, unknown routes |
+| `server/route.js`              | `tests/server/route.test.js`  | Route parsing, favicon, null body, health endpoint, admin auth, auth cache eviction, reset-database, unknown routes, runtime config updates (rate-limit + Redis) |
 | `server/index.js` (ESM)        | `tests/server/coverage-printlog.test.js` | Dynamic `import()` for V8-covered printLog, startServer, 500 catch |
 | `server/index.js` (child)      | `tests/server/graceful-shutdown.test.js` | SIGINT/SIGTERM via child process (V8 coverage) |
 | `db/migrate.js`                | `tests/db/migrate.test.js`   | Real migration + corrupt DB failure path |
@@ -76,6 +77,7 @@ Unit tests cover every source module individually. Each module has its own test 
 - **CJS cache injection**: Server tests inject mock `db/index.js` into the CJS `require.cache` before loading `server/index.js`, ensuring the mock is picked up by CommonJS `require()` calls.
 - **Rate limiter testing**: `middleware/rate-limiter.js` accepts options via `createRateLimiter({enabled, max, windowMs})`, making it easy to test with different configurations, mock Redis, and simulate circuit breaker states without re-importing. Tests cover in-memory fallback, Redis mode, CIDR proxy IP extraction, and escalating block durations.
 - **Seed dependency injection**: `db/seed.js` accepts `database` and `fetch` parameters, bypassing the need to mock `require('https')` and `require('../db')`.
+- **Runtime config testing**: Runtime configuration updates are tested through both unit tests (`route.test.js` with CJS cache injection) and integration tests (`integration.test.js` with real HTTP requests). The `updateConfig()` method on the rate limiter middleware is tested directly in `rate-limiter.test.js`, while Redis reconnection is tested in `redis.test.js` with real TCP servers.
 - **V8 coverage pragmas**: `/* v8 ignore */` comments exclude code paths that V8 cannot track through CJS module chains (e.g., CLI entry points, signal handlers, cross-worker coverage gaps).
 
 ## Configuration

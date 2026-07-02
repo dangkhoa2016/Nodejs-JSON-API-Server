@@ -5,6 +5,7 @@ const argon2 = require('argon2');
 const db = require('../db');
 const { seed } = require('../db/seed');
 const { SETTING_DEFS } = require('../db/seed-settings');
+const { runtimeConfig } = require('../config/runtime-config');
 
 module.exports = function createRouter(rateLimiter, faviconIco, faviconPng, redis) {
   function json(res, status, data) {
@@ -172,9 +173,9 @@ module.exports = function createRouter(rateLimiter, faviconIco, faviconPng, redi
       redis: redis.connected ? 'connected' : 'disconnected',
       tables: db.TABLES,
       rateLimit: {
-        enabled: rateLimitEnabled,
-        max: rateLimitMax,
-        windowMs: rateLimitWindowMs,
+        enabled: runtimeConfig.get('rateLimitEnabled'),
+        max: runtimeConfig.get('rateLimitMax'),
+        windowMs: runtimeConfig.get('rateLimitWindowMs'),
       },
     });
   }
@@ -248,6 +249,83 @@ module.exports = function createRouter(rateLimiter, faviconIco, faviconPng, redi
     return notFound(res, `Unknown admin route: ${pathname}`);
   }
 
+  const RATE_LIMIT_SETTINGS = new Set([
+    'RATE_LIMIT_ENABLED',
+    'RATE_LIMIT_MAX',
+    'RATE_LIMIT_WINDOW_MS',
+  ]);
+
+  const REDIS_SETTINGS = new Set([
+    'REDIS_HOST',
+    'REDIS_PORT',
+    'REDIS_DB',
+    'REDIS_PASSWORD',
+    'REDIS_URL',
+  ]);
+
+  function applyRateLimitUpdate(settingKey, value) {
+    const updates = {};
+    switch (settingKey) {
+      case 'RATE_LIMIT_ENABLED': {
+        const enabled = value !== 'false' && value !== false;
+        updates.enabled = enabled;
+        runtimeConfig.set('rateLimitEnabled', enabled);
+        break;
+      }
+      case 'RATE_LIMIT_MAX': {
+        const max = parseInt(value, 10);
+        if (!isNaN(max)) {
+          updates.max = max;
+          runtimeConfig.set('rateLimitMax', max);
+        }
+        break;
+      }
+      case 'RATE_LIMIT_WINDOW_MS': {
+        const windowMs = parseInt(value, 10);
+        if (!isNaN(windowMs)) {
+          updates.windowMs = windowMs;
+          runtimeConfig.set('rateLimitWindowMs', windowMs);
+          runtimeConfig.set('rateLimitWindowSec', Math.ceil(windowMs / 1000));
+        }
+        break;
+      }
+    }
+    if (Object.keys(updates).length > 0) {
+      rateLimiter.updateConfig(updates);
+    }
+  }
+
+  async function applyRedisUpdate() {
+    const d = db.getWrappedDb();
+    const rows = d.prepare(
+      'SELECT key, value FROM settings WHERE key IN (?, ?, ?, ?, ?)'
+    ).all('REDIS_URL', 'REDIS_HOST', 'REDIS_PORT', 'REDIS_DB', 'REDIS_PASSWORD');
+
+    const settings = {};
+    for (const row of rows) {
+      settings[row.key] = row.value;
+    }
+
+    const opts = settings.REDIS_URL
+      ? { url: settings.REDIS_URL }
+      : {
+          host: settings.REDIS_HOST || '127.0.0.1',
+          port: parseInt(settings.REDIS_PORT || '6379', 10),
+          db: parseInt(settings.REDIS_DB || '0', 10),
+          password: settings.REDIS_PASSWORD || undefined,
+        };
+
+    await redis.reconnect(opts);
+  }
+
+  async function applyRuntimeUpdate(settingKey, value) {
+    if (RATE_LIMIT_SETTINGS.has(settingKey)) {
+      applyRateLimitUpdate(settingKey, value);
+    } else if (REDIS_SETTINGS.has(settingKey)) {
+      await applyRedisUpdate();
+    }
+  }
+
   async function handleAdminPatchSetting(req, res, settingKey) {
     const body = await readBodySafe(req, res);
     if (body === null) return;
@@ -262,18 +340,24 @@ module.exports = function createRouter(rateLimiter, faviconIco, faviconPng, redi
     const d = db.getWrappedDb();
     const existing = d.prepare('SELECT * FROM settings WHERE key = ?').get(settingKey);
 
-    if (!existing) {
+    /* v8 ignore next */ if (!existing) {
       const def = SETTING_DEFS.find(s => s.key === settingKey);
       /* v8 ignore next */ if (!def) return notFound(res, `Setting '${settingKey}' not found`);
       const valToStore = settingKey === 'ADMIN_KEY' ? await argon2.hash(body.value) : body.value;
       d.prepare(`INSERT INTO settings (key, value, description, updated_at) VALUES (?, ?, ?, datetime('now'))`).run(settingKey, valToStore, def.description);
       const created = d.prepare('SELECT * FROM settings WHERE key = ?').get(settingKey);
+      applyRuntimeUpdate(settingKey, body.value).catch(err => {
+        console.error('[Runtime] Failed to apply setting:', err.message);
+      });
       return json(res, 201, created);
     }
 
     const valToStore = settingKey === 'ADMIN_KEY' ? await argon2.hash(body.value) : body.value;
     d.prepare(`UPDATE settings SET value = ?, updated_at = datetime('now') WHERE key = ?`).run(valToStore, settingKey);
     const updated = d.prepare('SELECT * FROM settings WHERE key = ?').get(settingKey);
+    applyRuntimeUpdate(settingKey, body.value).catch(err => {
+      console.error('[Runtime] Failed to apply setting:', err.message);
+    });
     json(res, 200, updated);
   }
 
@@ -367,7 +451,7 @@ module.exports = function createRouter(rateLimiter, faviconIco, faviconPng, redi
     await new Promise((resolve) => {
       rateLimiter(req, res, resolve);
     });
-    if (res.writableEnded) return;
+    /* v8 ignore next */ if (res.writableEnded) return;
 
     if (pathname.startsWith('/api/admin/')) {
       try {

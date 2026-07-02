@@ -650,4 +650,65 @@ describe('Admin routes', () => {
     expect(res.status).toBe(200);
     expect(res.body.message).toContain('reset');
   });
+
+  it('PATCH RATE_LIMIT_MAX updates health endpoint immediately', async () => {
+    const patchRes = await request('/api/admin/settings/RATE_LIMIT_MAX', {
+      method: 'PATCH',
+      headers: { authorization: `Bearer ${adminToken}` },
+      body: { value: '50' },
+    });
+    expect(patchRes.status).toBe(200);
+
+    const healthRes = await request('/health');
+    expect(healthRes.status).toBe(200);
+    expect(healthRes.body.rateLimit.max).toBe(50);
+
+    await request('/api/admin/settings/RATE_LIMIT_MAX', {
+      method: 'PATCH',
+      headers: { authorization: `Bearer ${adminToken}` },
+      body: { value: '100' },
+    });
+  });
+
+  it('PATCH RATE_LIMIT_WINDOW_MS updates health endpoint immediately', async () => {
+    const patchRes = await request('/api/admin/settings/RATE_LIMIT_WINDOW_MS', {
+      method: 'PATCH',
+      headers: { authorization: `Bearer ${adminToken}` },
+      body: { value: '30000' },
+    });
+    expect(patchRes.status).toBe(200);
+
+    const healthRes = await request('/health');
+    expect(healthRes.status).toBe(200);
+    expect(healthRes.body.rateLimit.windowMs).toBe(30000);
+  });
+
+  it('PATCH RATE_LIMIT_ENABLED updates health endpoint immediately', async () => {
+    const patchRes = await request('/api/admin/settings/RATE_LIMIT_ENABLED', {
+      method: 'PATCH',
+      headers: { authorization: `Bearer ${adminToken}` },
+      body: { value: 'true' },
+    });
+    expect(patchRes.status).toBe(200);
+
+    const healthRes = await request('/health');
+    expect(healthRes.status).toBe(200);
+    expect(healthRes.body.rateLimit.enabled).toBe(true);
+
+    await request('/api/admin/settings/RATE_LIMIT_ENABLED', {
+      method: 'PATCH',
+      headers: { authorization: `Bearer ${adminToken}` },
+      body: { value: 'false' },
+    });
+  });
+
+  it('PATCH REDIS_HOST triggers applyRedisUpdate and catches reconnect error', async () => {
+    const res = await request('/api/admin/settings/REDIS_HOST', {
+      method: 'PATCH',
+      headers: { authorization: `Bearer ${adminToken}` },
+      body: { value: '127.0.0.1' },
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.value).toBe('127.0.0.1');
+  });
 });

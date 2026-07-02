@@ -66,6 +66,7 @@ Environment files are loaded by `src/config/load-env.js` (auto-run via `src/conf
 | `MAX_BODY_SIZE`        | `1048576`   | Max request body size in bytes (minimum 1) |
 | `DEFAULT_PAGE_SIZE`   | `10`        | Default number of results per page for `_page`/`_limit` pagination |
 | `ADMIN_KEY`           | _(none)_    | Master key to authenticate admin API requests (Bearer token) |
+| **Runtime updates**   | —           | Patching `RATE_LIMIT_ENABLED`, `RATE_LIMIT_MAX`, `RATE_LIMIT_WINDOW_MS`, `REDIS_URL`, `REDIS_HOST`, `REDIS_PORT`, `REDIS_DB`, or `REDIS_PASSWORD` via the admin API applies changes immediately — no server restart needed |
 
 ---
 
@@ -170,7 +171,7 @@ GET /api/posts?_sort=id&_order=desc&_limit=2
 | `GET /health`                     | Server status (Redis, tables, rate limit config) |
 | `GET /api/health`                 | Same as above                        |
 | `GET /api/admin/settings`         | List all settings (requires auth)    |
-| `PATCH /api/admin/settings/:key`  | Update a setting value (requires auth) |
+| `PATCH /api/admin/settings/:key`  | Update a setting value — rate-limit & Redis changes take **immediate effect** at runtime (requires auth) |
 | `POST /api/admin/reset-database`  | Clear data tables and re-seed from JSONPlaceholder (requires auth) |
 
 ### Admin API
@@ -196,6 +197,8 @@ curl -X POST http://localhost:3000/api/admin/reset-database \
 ```
 
 The `ADMIN_KEY` is hashed with **argon2** before storage. When updating the password via `PATCH /api/admin/settings/ADMIN_KEY`, the new value is automatically hashed. Passwords are never stored in plaintext.
+
+**Runtime configuration updates**: When patching rate-limit settings (`RATE_LIMIT_ENABLED`, `RATE_LIMIT_MAX`, `RATE_LIMIT_WINDOW_MS`) or Redis connection settings (`REDIS_HOST`, `REDIS_PORT`, `REDIS_DB`, `REDIS_PASSWORD`, `REDIS_URL`), the server applies the changes immediately via the `RuntimeConfig` class — no restart required. Rate-limit changes call `rateLimiter.updateConfig()` to hot-swap the middleware's behavior, while Redis settings trigger a graceful reconnect through `Redis.reconnect()`.
 
 Argon2 verification results are **cached in-memory for 5 seconds** per token, avoiding repeated hashing on consecutive admin requests. On error, the result is also cached as invalid — preventing timing or error-message side-channel leaks.
 
@@ -269,6 +272,7 @@ json-api-server/
 │   ├── config/
 │   │   ├── index.js              # Centralized config — auto-loads dotenv via load-env.js, exports camelCase
 │   │   ├── load-env.js           # Shared dotenv loader — auto-run on require, skips in production
+│   │   ├── runtime-config.js     # Thread-safe in-memory config overrides for runtime updates (rate-limit, Redis)
 │   │   └── setting-defs.js       # Setting definitions for 14 env vars (NODE_ENV, PORT, ADMIN_KEY, etc.)
 │   ├── db/
 │   │   ├── index.js              # SQLite layer (node:sqlite) — CRUD operations (reads config)
@@ -286,7 +290,7 @@ json-api-server/
 │   │   └── license.md            # Flaticon license file
 │   └── server/
 │       ├── index.js              # HTTP server, graceful shutdown, startup orchestration
-│       └── route.js              # Route parser, request handlers, admin auth, favicon
+│       └── route.js              # Route parser, request handlers, admin auth, favicon, runtime config updates
 ├── tests/
 │   ├── config/
 │   │   ├── config.test.js           # Config defaults and env var branches (9)
@@ -297,15 +301,15 @@ json-api-server/
 │   │   ├── seed.test.js             # Seed with real DB + mocked deps, JSONPlaceholder fetch (5)
 │   │   └── sql-logger.test.js       # SQL query logger wrapping (5)
 │   ├── middleware/
-│   │   └── rate-limiter.test.js     # In-memory, Redis, circuit breaker, proxy IPs (54)
+│   │   └── rate-limiter.test.js     # In-memory, Redis, circuit breaker, proxy IPs, updateConfig (57)
 │   ├── redis/
-│   │   └── redis.test.js            # RESP protocol encoding/parsing, constructor options, eval method (27)
+│   │   └── redis.test.js            # RESP protocol encoding/parsing, constructor options, eval, reconnect (33)
 │   ├── server/
 │   │   ├── coverage-printlog.test.js # Printlog and server export V8 coverage (4)
 │   │   ├── graceful-shutdown.test.js # SIGINT/SIGTERM handler coverage (1)
 │   │   ├── index.test.js            # Server request handler, admin auth, graceful shutdown (13)
-│   │   ├── integration.test.js      # API integration tests — real HTTP + SQLite (77)
-│   │   └── route.test.js            # Route parsing, favicon, health, admin auth cache (14)
+│   │   ├── integration.test.js      # API integration tests — real HTTP + SQLite, runtime PATCH (81)
+│   │   └── route.test.js            # Route parsing, favicon, health, admin auth cache, runtime config (18)
 │   ├── README.md                    # Testing documentation
 │   └── helpers/
 │       ├── coverage.js              # Test-coverage utilities (save/restore/setEnv/clearCjs/configMockFactory)
@@ -388,7 +392,7 @@ This runs comprehensive queries to inspect row counts, column metadata, relation
 
 ## Testing
 
-Uses **vitest** with **V8 native coverage**. **233 tests across 14 test files** cover the full stack — from integration tests (real HTTP server + SQLite) to unit tests for every module.
+Uses **vitest** with **V8 native coverage**. **250 tests across 14 test files** cover the full stack — from integration tests (real HTTP server + SQLite) to unit tests for every module.
 
 ```bash
 npm test              # Run all tests once
@@ -405,6 +409,7 @@ See [tests/README.md](tests/README.md) for full documentation.
 - **Pure RESP protocol** — the Redis client in `src/redis/index.js` implements the Redis serialization protocol over raw TCP sockets without any third-party library. Supports `AUTH` password authentication and `REDIS_URL` connection strings.
 - **Centralized config** — all environment variables are read in `src/config/index.js` and exported as camelCase (`port`, `dbPath`, `redisOpts`, `rateLimitMax`, `dbDebugSql`, `sensitiveKeys`, etc.) for use across the codebase.
 - **Rate limiter** — \`src/middleware/rate-limiter.js\` features a circuit breaker for Redis failures, CIDR-based trusted proxy IP extraction, escalating block durations (5m → 20m → 1h), atomic Redis Lua scripts, and an in-memory fallback with LRU eviction. \`createRateLimiter()\` accepts options directly instead of reading config lazily.
+- **Runtime configuration** — Patching rate-limit or Redis settings via the admin API immediately applies changes through `RuntimeConfig` (in-memory overrides), avoiding server restarts. Rate-limit hot-swapping uses `rateLimiter.updateConfig()`; Redis reconnection uses `Redis.reconnect()`.
 - **Testable seed script** — `src/db/seed.js` accepts `database` and `fetch` parameters via dependency injection, enabling full unit testing without mocking `require()`.
 - **SQL query logging** — `src/db/sql-logger.js` exports `wrapDb`/`wrapStmt` Proxy wrappers that log `exec`, `prepare`, `run`, `get`, and `all` calls to stderr. `src/db/index.js` uses them via `getWrappedDb()` when `DEBUG_SQL=true`.
 - **Multi-environment** — `src/config/index.js` requires `src/config/load-env.js` at module level, which chain-loads all dotenv files in priority order with `override: false` — existing `process.env` values and earlier files take precedence over later ones. Every consumer (server, migrate, seed) simply requires `src/config/index.js` and gets correct env values. In production, dotenv is skipped entirely — env vars must come from the deployment environment.

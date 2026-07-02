@@ -170,6 +170,33 @@ class RedisClient {
     this.socket.destroy();
     return Promise.resolve();
   }
+
+  reconnect(options) {
+    this.quit();
+    for (const item of this.queue) {
+      item.reject(new Error('Reconnecting'));
+    }
+    this.connected = false;
+    this._connecting = false;
+    this.queue = [];
+    this.buffer = '';
+    this._rawBuf = null;
+    this.socket = null;
+    if (options.url) {
+      const parsed = new URL(options.url);
+      this.host = parsed.hostname || '127.0.0.1';
+      this.port = parsed.port ? parseInt(parsed.port, 10) : 6379;
+      this.password = parsed.password || undefined;
+      const dbMatch = parsed.pathname.match(/^\/(\d+)$/);
+      this.db = dbMatch ? parseInt(dbMatch[1], 10) : 0;
+    } else {
+      if (options.host !== undefined) this.host = options.host;
+      if (options.port !== undefined) this.port = options.port;
+      if (options.db !== undefined) this.db = options.db;
+      if (options.password !== undefined) this.password = options.password;
+    }
+    return this.connect();
+  }
 }
 
 module.exports = RedisClient;

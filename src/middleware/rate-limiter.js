@@ -282,21 +282,22 @@ function isExemptRoute(path, exemptRoutes = ['/health', '/status', '/favicon.ico
 }
 
 function createRateLimiter(redis, options = {}) {
-  const {
-    enabled = true,
-    max = 100,
-    windowMs = DEFAULT_WINDOW_MS,
-    exemptRoutes = ['/health', '/status', '/favicon.ico'],
-    logger = console,
-    retryDelayMs = null
-  } = options;
+  const config = {
+    enabled: true,
+    max: 100,
+    windowMs: DEFAULT_WINDOW_MS,
+    exemptRoutes: ['/health', '/status', '/favicon.ico'],
+    logger: console,
+    retryDelayMs: null,
+  };
 
-  const windowSec = Math.floor(windowMs / 1000);
+  Object.assign(config, options);
 
-  /* v8 ignore next */
-  if (!enabled) return async (_req, _res, next) => next();
+  const middleware = async function rateLimiter(req, res, next) {
+    if (!config.enabled) return next();
 
-  return async function rateLimiter(req, res, next) {
+    const { max, windowMs, exemptRoutes, logger, retryDelayMs } = config;
+    const windowSec = Math.floor(windowMs / 1000);
     const path = req.url ? req.url.split('?')[0] : (req.path || '/');
     if (isExemptRoute(path, exemptRoutes)) return next();
 
@@ -342,6 +343,12 @@ function createRateLimiter(redis, options = {}) {
 
     next();
   };
+
+  middleware.updateConfig = (updates) => {
+    Object.assign(config, updates);
+  };
+
+  return middleware;
 }
 
 module.exports = {

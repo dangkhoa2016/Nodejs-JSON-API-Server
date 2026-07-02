@@ -315,4 +315,100 @@ describe('redis.js connect handlers', () => {
     c.socket.destroy(new Error('ECONNRESET'))
     await closeServer(server)
   })
+
+  it('reconnect updates host and port and reconnects', async () => {
+    let connections = 0
+    const server = net.createServer((socket) => {
+      connections++
+      socket.on('data', () => socket.write(Buffer.from('+OK\r\n')))
+    })
+    await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
+    const { port } = server.address()
+    const RedisClient = _require('../../src/redis/index.js')
+    const c = new RedisClient({ host: '127.0.0.1', port })
+
+    await c.connect()
+    expect(c.connected).toBe(true)
+    expect(connections).toBe(1)
+
+    await c.reconnect({ host: '127.0.0.1', port })
+    expect(c.connected).toBe(true)
+    expect(connections).toBe(2)
+    expect(c.host).toBe('127.0.0.1')
+    expect(c.port).toBe(port)
+    c.socket.destroy()
+    await closeServer(server)
+  })
+
+  it('reconnect with url re-parses all fields', async () => {
+    const RedisClient = _require('../../src/redis/index.js')
+    const c = new RedisClient({ host: 'oldhost', port: 6379 })
+    c.socket = { write: vi.fn(), destroy: vi.fn() }
+    c.queue.push({ reject: vi.fn() })
+
+    const connectSpy = vi.spyOn(c, 'connect').mockResolvedValue()
+    await c.reconnect({ url: 'redis://:newpass@newhost:6380/3' })
+    expect(c.host).toBe('newhost')
+    expect(c.port).toBe(6380)
+    expect(c.password).toBe('newpass')
+    expect(c.db).toBe(3)
+    expect(c.connected).toBe(false)
+    expect(c.queue.length).toBe(0)
+    expect(connectSpy).toHaveBeenCalled()
+    connectSpy.mockRestore()
+  })
+
+  it('reconnect rejects pending queue items', async () => {
+    const RedisClient = _require('../../src/redis/index.js')
+    const c = new RedisClient({ host: '127.0.0.1', port: 6379 })
+    c.socket = { write: vi.fn(), destroy: vi.fn() }
+    const rejectFn = vi.fn()
+    c.queue.push({ resolve: vi.fn(), reject: rejectFn })
+    c.queue.push({ resolve: vi.fn(), reject: vi.fn() })
+
+    const connectSpy = vi.spyOn(c, 'connect').mockResolvedValue()
+    await c.reconnect({ host: '127.0.0.1', port: 6379 })
+    expect(rejectFn).toHaveBeenCalledWith(expect.objectContaining({ message: 'Reconnecting' }))
+    expect(c.queue.length).toBe(0)
+    connectSpy.mockRestore()
+  })
+
+  it('reconnect with minimal URL covers default fallbacks', async () => {
+    const RedisClient = _require('../../src/redis/index.js')
+    const c = new RedisClient({ host: 'oldhost', port: 9999, password: 'oldpw', db: 99 })
+    c.socket = { write: vi.fn(), destroy: vi.fn() }
+    const connectSpy = vi.spyOn(c, 'connect').mockResolvedValue()
+    await c.reconnect({ url: 'redis:///0' })
+    expect(c.host).toBe('127.0.0.1')
+    expect(c.port).toBe(6379)
+    expect(c.password).toBeUndefined()
+    expect(c.db).toBe(0)
+    connectSpy.mockRestore()
+  })
+
+  it('reconnect with all individual options sets all fields', async () => {
+    const RedisClient = _require('../../src/redis/index.js')
+    const c = new RedisClient({ host: '127.0.0.1', port: 6379 })
+    c.socket = { write: vi.fn(), destroy: vi.fn() }
+    const connectSpy = vi.spyOn(c, 'connect').mockResolvedValue()
+    await c.reconnect({ host: 'newhost', port: 6380, db: 3, password: 'secret' })
+    expect(c.host).toBe('newhost')
+    expect(c.port).toBe(6380)
+    expect(c.db).toBe(3)
+    expect(c.password).toBe('secret')
+    connectSpy.mockRestore()
+  })
+
+  it('reconnect with empty options preserves existing values', async () => {
+    const RedisClient = _require('../../src/redis/index.js')
+    const c = new RedisClient({ host: '127.0.0.1', port: 6379, db: 1, password: 'pw' })
+    c.socket = { write: vi.fn(), destroy: vi.fn() }
+    const connectSpy = vi.spyOn(c, 'connect').mockResolvedValue()
+    await c.reconnect({})
+    expect(c.host).toBe('127.0.0.1')
+    expect(c.port).toBe(6379)
+    expect(c.db).toBe(1)
+    expect(c.password).toBe('pw')
+    connectSpy.mockRestore()
+  })
 })

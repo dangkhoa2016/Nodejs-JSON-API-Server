@@ -4,14 +4,14 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
-const { port, redisOpts, rateLimitEnabled, rateLimitMax, rateLimitWindowSec } = require('../config');
+const { port, redisOpts, rateLimitEnabled, rateLimitMax, rateLimitWindowMs, rateLimitWindowSec } = require('../config');
 const RedisClient = require('../redis');
 const { createRateLimiter } = require('../middleware/rate-limiter');
 const createRouter = require('./route');
 
 const redis = new RedisClient(redisOpts);
 
-const rateLimiter = createRateLimiter(redis, { enabled: rateLimitEnabled });
+const rateLimiter = createRateLimiter(redis, { enabled: rateLimitEnabled, max: rateLimitMax, windowMs: rateLimitWindowMs });
 
 const faviconIco = fs.readFileSync(path.join(__dirname, '..', 'public', 'favicon.ico'));
 const faviconPng = fs.readFileSync(path.join(__dirname, '..', 'public', 'favicon.png'));

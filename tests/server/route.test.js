@@ -477,6 +477,239 @@ describe('route.js', () => {
     restore(s)
   })
 
+  it('covers runtime update for Redis setting with reconnect error in CREATE path', async () => {
+    const s = save('START_SERVER', 'PORT', 'REDIS_URL', 'DB_PATH', 'ADMIN_KEY')
+    setEnv({ START_SERVER: 'false', PORT: '0', REDIS_URL: '', DB_PATH: ':memory:', ADMIN_KEY: 'secret' })
+
+    const argon2 = _require('argon2')
+    const origVerify = argon2.verify
+    const origHash = argon2.hash
+    argon2.verify = vi.fn().mockResolvedValue(true)
+    argon2.hash = vi.fn().mockResolvedValue('$argon2id$hash')
+
+    const mockDb = mkDb({
+      getWrappedDb: () => ({
+        prepare: (sql) => {
+          if (sql.includes('SELECT value FROM settings')) return { get: () => ({ value: '$argon2id$hash' }) }
+          if (sql.includes('SELECT * FROM settings WHERE key = ?')) return { get: () => null }
+          if (sql.includes('SELECT key, value FROM settings WHERE key IN')) return { all: () => [{ key: 'REDIS_HOST', value: '10.0.0.1' }] }
+          return { all: () => [], get: () => null, run: () => {} }
+        },
+        exec: () => {},
+      }),
+      listAll: () => [{ key: 'ADMIN_KEY', value: '$argon2id$hash' }],
+      TABLES: ['users', 'posts', 'comments', 'albums', 'photos', 'todos', 'settings'],
+    })
+
+    const resolvedConfig = _require.resolve('../../src/config/index.js')
+    const origConfigCache = _require.cache[resolvedConfig]
+    clearCjs('../../src/server/index.js', '../../src/server/route.js', '../../src/db/index.js', '../../src/middleware/rate-limiter.js', '../../src/config/index.js')
+    const resolvedDb = _require.resolve('../../src/db/index.js')
+    const resolvedRedis = _require.resolve('../../src/redis/index.js')
+    const { mockRedisClass } = mkRedis({ reconnect: vi.fn().mockRejectedValue(new Error('No Redis')) })
+    const origDbCache = _require.cache[resolvedDb]
+    const origRedisCache = _require.cache[resolvedRedis]
+    _require.cache[resolvedDb] = { exports: mockDb, id: resolvedDb, filename: resolvedDb, loaded: true }
+    _require.cache[resolvedRedis] = { exports: mockRedisClass, id: resolvedRedis, filename: resolvedRedis, loaded: true }
+
+    try {
+      vi.resetModules()
+      const { requestHandler } = await import('../../src/server/index.js')
+
+      const res = mkRes()
+      await requestHandler(mkReq('/api/admin/settings/REDIS_HOST', 'PATCH', { authorization: 'Bearer secret' }, JSON.stringify({ value: '10.0.0.1' })), res)
+      expect(res.writeHead).toHaveBeenCalledWith(201, expect.anything())
+    } finally {
+      argon2.verify = origVerify
+      argon2.hash = origHash
+      if (origDbCache) _require.cache[resolvedDb] = origDbCache
+      else delete _require.cache[resolvedDb]
+      if (origRedisCache) _require.cache[resolvedRedis] = origRedisCache
+      else delete _require.cache[resolvedRedis]
+      if (origConfigCache) _require.cache[resolvedConfig] = origConfigCache
+      else delete _require.cache[resolvedConfig]
+    }
+    restore(s)
+  })
+
+  it('covers rate limit NaN branches for both MAX and WINDOW_MS', async () => {
+    const s = save('START_SERVER', 'PORT', 'REDIS_URL', 'DB_PATH', 'ADMIN_KEY')
+    setEnv({ START_SERVER: 'false', PORT: '0', REDIS_URL: '', DB_PATH: ':memory:', ADMIN_KEY: 'secret', RATE_LIMIT_ENABLED: 'false' })
+
+    const argon2 = _require('argon2')
+    const origVerify = argon2.verify
+    const origHash = argon2.hash
+    argon2.verify = vi.fn().mockResolvedValue(true)
+    argon2.hash = vi.fn().mockResolvedValue('$argon2id$hash')
+
+    const mockDb = mkDb({
+      getWrappedDb: () => ({
+        prepare: (sql) => {
+          if (sql.includes('SELECT value FROM settings')) return { get: () => ({ value: '$argon2id$hash' }) }
+          if (sql.includes('SELECT * FROM settings WHERE key = ?')) return { get: () => null }
+          return { all: () => [], get: () => null, run: () => {} }
+        },
+        exec: () => {},
+      }),
+      listAll: () => [],
+      TABLES: ['users', 'posts', 'comments', 'albums', 'photos', 'todos', 'settings'],
+    })
+
+    const resolvedConfig = _require.resolve('../../src/config/index.js')
+    const origConfigCache = _require.cache[resolvedConfig]
+    clearCjs('../../src/server/index.js', '../../src/server/route.js', '../../src/db/index.js', '../../src/middleware/rate-limiter.js', '../../src/config/index.js')
+    const resolvedDb = _require.resolve('../../src/db/index.js')
+    const resolvedRedis = _require.resolve('../../src/redis/index.js')
+    const { mockRedisClass } = mkRedis()
+    const origDbCache = _require.cache[resolvedDb]
+    const origRedisCache = _require.cache[resolvedRedis]
+    _require.cache[resolvedDb] = { exports: mockDb, id: resolvedDb, filename: resolvedDb, loaded: true }
+    _require.cache[resolvedRedis] = { exports: mockRedisClass, id: resolvedRedis, filename: resolvedRedis, loaded: true }
+
+    try {
+      vi.resetModules()
+      const { requestHandler } = await import('../../src/server/index.js')
+
+      const resMax = mkRes()
+      await requestHandler(mkReq('/api/admin/settings/RATE_LIMIT_MAX', 'PATCH', { authorization: 'Bearer secret' }, JSON.stringify({ value: 'abc' })), resMax)
+      expect(resMax.writeHead).toHaveBeenCalledWith(201, expect.anything())
+
+      const resWin = mkRes()
+      await requestHandler(mkReq('/api/admin/settings/RATE_LIMIT_WINDOW_MS', 'PATCH', { authorization: 'Bearer secret' }, JSON.stringify({ value: 'xyz' })), resWin)
+      expect(resWin.writeHead).toHaveBeenCalledWith(201, expect.anything())
+    } finally {
+      argon2.verify = origVerify
+      argon2.hash = origHash
+      if (origDbCache) _require.cache[resolvedDb] = origDbCache
+      else delete _require.cache[resolvedDb]
+      if (origRedisCache) _require.cache[resolvedRedis] = origRedisCache
+      else delete _require.cache[resolvedRedis]
+      if (origConfigCache) _require.cache[resolvedConfig] = origConfigCache
+      else delete _require.cache[resolvedConfig]
+    }
+    restore(s)
+  })
+
+  it('covers REDIS_URL truthy branch in applyRedisUpdate', async () => {
+    const s = save('START_SERVER', 'PORT', 'REDIS_URL', 'DB_PATH', 'ADMIN_KEY')
+    setEnv({ START_SERVER: 'false', PORT: '0', REDIS_URL: '', DB_PATH: ':memory:', ADMIN_KEY: 'secret', RATE_LIMIT_ENABLED: 'false' })
+
+    const argon2 = _require('argon2')
+    const origVerify = argon2.verify
+    const origHash = argon2.hash
+    argon2.verify = vi.fn().mockResolvedValue(true)
+    argon2.hash = vi.fn().mockResolvedValue('$argon2id$hash')
+
+    const mockDb = mkDb({
+      getWrappedDb: () => ({
+        prepare: (sql) => {
+          if (sql.includes('SELECT value FROM settings')) return { get: () => ({ value: '$argon2id$hash' }) }
+          if (sql.includes('SELECT key, value FROM settings WHERE key IN')) return { all: () => [{ key: 'REDIS_URL', value: 'redis://myhost:6379/0' }] }
+          return { all: () => [], get: () => null, run: () => {} }
+        },
+        exec: () => {},
+      }),
+      listAll: () => [],
+      TABLES: ['users', 'posts', 'comments', 'albums', 'photos', 'todos', 'settings'],
+    })
+
+    const resolvedConfig = _require.resolve('../../src/config/index.js')
+    const origConfigCache = _require.cache[resolvedConfig]
+    clearCjs('../../src/server/index.js', '../../src/server/route.js', '../../src/db/index.js', '../../src/middleware/rate-limiter.js', '../../src/config/index.js')
+    const resolvedDb = _require.resolve('../../src/db/index.js')
+    const resolvedRedis = _require.resolve('../../src/redis/index.js')
+    const { mockRedisClass } = mkRedis({ reconnect: vi.fn().mockRejectedValue(new Error('No Redis')) })
+    const origDbCache = _require.cache[resolvedDb]
+    const origRedisCache = _require.cache[resolvedRedis]
+    _require.cache[resolvedDb] = { exports: mockDb, id: resolvedDb, filename: resolvedDb, loaded: true }
+    _require.cache[resolvedRedis] = { exports: mockRedisClass, id: resolvedRedis, filename: resolvedRedis, loaded: true }
+
+    try {
+      vi.resetModules()
+      const { requestHandler } = await import('../../src/server/index.js')
+
+      const res = mkRes()
+      await requestHandler(mkReq('/api/admin/settings/REDIS_HOST', 'PATCH', { authorization: 'Bearer secret' }, JSON.stringify({ value: '10.0.0.1' })), res)
+      expect(res.writeHead).toHaveBeenCalledWith(201, expect.anything())
+    } finally {
+      argon2.verify = origVerify
+      argon2.hash = origHash
+      if (origDbCache) _require.cache[resolvedDb] = origDbCache
+      else delete _require.cache[resolvedDb]
+      if (origRedisCache) _require.cache[resolvedRedis] = origRedisCache
+      else delete _require.cache[resolvedRedis]
+      if (origConfigCache) _require.cache[resolvedConfig] = origConfigCache
+      else delete _require.cache[resolvedConfig]
+    }
+    restore(s)
+  })
+
+  it('covers PATCH existing setting UPDATE path and writableEnded', async () => {
+    const s = save('START_SERVER', 'PORT', 'REDIS_URL', 'DB_PATH', 'ADMIN_KEY')
+    setEnv({ START_SERVER: 'false', PORT: '0', REDIS_URL: '', DB_PATH: ':memory:', ADMIN_KEY: 'secret', RATE_LIMIT_ENABLED: 'false' })
+
+    const argon2 = _require('argon2')
+    const origVerify = argon2.verify
+    const origHash = argon2.hash
+    argon2.verify = vi.fn().mockResolvedValue(true)
+    argon2.hash = vi.fn().mockResolvedValue('$argon2id$hash')
+
+    const settingsTable = [
+      { key: 'ADMIN_KEY', value: '$argon2id$hash', description: 'Admin key', updated_at: '2025-01-01' },
+      { key: 'RATE_LIMIT_MAX', value: '100', description: 'Rate limit max', updated_at: '2025-01-01' },
+    ]
+    const mockDb = mkDb({
+      getWrappedDb: () => ({
+        prepare: (sql) => {
+          if (sql.includes('SELECT value FROM settings')) return { get: () => settingsTable[0] }
+          return {
+            all: () => settingsTable,
+            get: (key) => settingsTable.find(s => s.key === key) || null,
+            run: () => {},
+          }
+        },
+        exec: () => {},
+      }),
+      listAll: () => settingsTable,
+      TABLES: ['users', 'posts', 'comments', 'albums', 'photos', 'todos', 'settings'],
+    })
+
+    const resolvedConfig = _require.resolve('../../src/config/index.js')
+    clearCjs('../../src/server/index.js', '../../src/server/route.js', '../../src/db/index.js', '../../src/middleware/rate-limiter.js', '../../src/config/index.js')
+    const resolvedDb = _require.resolve('../../src/db/index.js')
+    const resolvedRedis = _require.resolve('../../src/redis/index.js')
+    const { mockRedisClass } = mkRedis()
+    const origDbCache = _require.cache[resolvedDb]
+    const origRedisCache = _require.cache[resolvedRedis]
+    const origConfigCache = _require.cache[resolvedConfig]
+    _require.cache[resolvedDb] = { exports: mockDb, id: resolvedDb, filename: resolvedDb, loaded: true }
+    _require.cache[resolvedRedis] = { exports: mockRedisClass, id: resolvedRedis, filename: resolvedRedis, loaded: true }
+
+    try {
+      vi.resetModules()
+      const { requestHandler, resetAuthCache } = await import('../../src/server/index.js')
+
+      const res1 = mkRes()
+      await requestHandler(mkReq('/api/admin/settings/RATE_LIMIT_MAX', 'PATCH', { authorization: 'Bearer secret' }, JSON.stringify({ value: '200' })), res1)
+      expect(res1.writeHead).toHaveBeenCalledWith(200, expect.anything())
+
+      const res2 = mkRes()
+      res2.writableEnded = true
+      await requestHandler(mkReq('/api/users', 'GET'), res2)
+      expect(res2.writeHead).not.toHaveBeenCalled()
+    } finally {
+      argon2.verify = origVerify
+      argon2.hash = origHash
+      if (origDbCache) _require.cache[resolvedDb] = origDbCache
+      else delete _require.cache[resolvedDb]
+      if (origRedisCache) _require.cache[resolvedRedis] = origRedisCache
+      else delete _require.cache[resolvedRedis]
+      if (origConfigCache) _require.cache[resolvedConfig] = origConfigCache
+      else delete _require.cache[resolvedConfig]
+    }
+    restore(s)
+  })
+
   it('covers remaining route.js branches together', async () => {
     const s = save('START_SERVER', 'PORT', 'REDIS_URL', 'DB_PATH', 'ADMIN_KEY')
     setEnv({ START_SERVER: 'false', PORT: '0', REDIS_URL: '', DB_PATH: ':memory:', ADMIN_KEY: 'secret' })

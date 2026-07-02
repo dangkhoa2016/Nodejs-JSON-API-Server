@@ -37,6 +37,12 @@ const DEFAULT_PAGE_SIZE = parseInt(process.env.DEFAULT_PAGE_SIZE || '10', 10);
 
 const SENSITIVE_KEYS = ['REDIS_PASSWORD', 'ADMIN_KEY'];
 
+const { runtimeConfig } = require('./runtime-config');
+runtimeConfig.set('rateLimitEnabled', RATE_LIMIT_ENABLED);
+runtimeConfig.set('rateLimitMax', RATE_LIMIT_MAX);
+runtimeConfig.set('rateLimitWindowMs', RATE_LIMIT_WINDOW_MS);
+runtimeConfig.set('rateLimitWindowSec', RATE_LIMIT_WINDOW_SEC);
+
 module.exports = {
   port: PORT,
   dbPath: DB_PATH,
