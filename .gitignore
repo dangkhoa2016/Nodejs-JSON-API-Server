@@ -8,3 +8,5 @@ storage/*
 !storage/.gitkeep
 
 .env.dev
+manual-test-coverage/results
+manual-test-coverage/coverage-report.md

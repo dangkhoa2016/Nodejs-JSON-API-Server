@@ -329,6 +329,9 @@ json-api-server/
 │   ├── posts.sh                 # Posts endpoints
 │   ├── todos.sh                 # Todos endpoints
 │   └── users.sh                 # Users endpoints
+├── manual-test-coverage/
+│   ├── README.md                    # Coverage verification documentation
+│   └── verify-commit-coverage.sh    # Coverage verification script
 ├── storage/                     # SQLite database files (auto-created)
 ├── temp/                        # Temporary files (gitignored)
 ├── .env                         # Base configuration (tried first in development — highest priority)
