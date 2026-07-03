@@ -318,8 +318,17 @@ json-api-server/
 │       └── seed.js                  # Standalone script to create & seed temp DB
 │   └── seed-settings-coverage.test.js  # Seed-settings.js V8 coverage (4)
 ├── manual/
+│   ├── admin.sh                 # Admin panel curl commands
+│   ├── albums.sh                # Albums endpoints
+│   ├── comments.sh              # Comments endpoints
 │   ├── curl.sh                  # Quick curl commands
-│   └── inspect-queries.sql      # SQL queries for database inspection
+│   ├── health.sh                # Health endpoint
+│   ├── inspect-queries.sql      # SQL queries for database inspection
+│   ├── inspect.sh               # Database inspection script
+│   ├── photos.sh                # Photos endpoints
+│   ├── posts.sh                 # Posts endpoints
+│   ├── todos.sh                 # Todos endpoints
+│   └── users.sh                 # Users endpoints
 ├── storage/                     # SQLite database files (auto-created)
 ├── temp/                        # Temporary files (gitignored)
 ├── .env                         # Base configuration (tried first in development — highest priority)

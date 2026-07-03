@@ -112,7 +112,11 @@ UNION ALL
 SELECT 'albums', 'userId', a.userId
 FROM albums a LEFT JOIN users u ON u.id = a.userId WHERE u.id IS NULL;
 
---  8. STATISTICS
+--  8. SETTINGS
+--  ..............................................................................
+SELECT id, key, value, description, updated_at FROM settings ORDER BY key;
+
+--  9. STATISTICS
 --  ..............................................................................
 SELECT 'posts' AS type, AVG(LENGTH(body)) AS avg_len, MIN(LENGTH(body)) AS min_len, MAX(LENGTH(body)) AS max_len FROM posts
 UNION ALL
