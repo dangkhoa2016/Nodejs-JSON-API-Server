@@ -30,6 +30,67 @@ npm start          # start server
 npm run dev
 ```
 
+## Docker
+
+### Build
+
+```bash
+docker build -t json-api-server .
+```
+
+### Run
+
+```bash
+docker run -d -p 3000:3000 -v ./storage:/app/storage --name json-api-server json-api-server
+```
+
+The entrypoint automatically runs `npm run db:setup` (migrate + seed) on container start.
+
+### Environment Variables
+
+```bash
+docker run -d -p 3000:3000 \
+  -e PORT=3000 \
+  -e ADMIN_KEY=my-secret-key \
+  -e REDIS_HOST=redis \
+  -v ./storage:/app/storage \
+  --name json-api-server json-api-server
+```
+
+### Notes
+
+- The container runs as a non-root `app` user.
+- Database files persist in `/app/storage` (declared as a `VOLUME`).
+- `NODE_ENV=production` is set by default — dotenv is **skipped**, so all config must come via environment variables (see below).
+- `.env` and `.env.*` files are **excluded** by `.dockerignore` and are **not copied** into the image.
+- The entrypoint runs `npm run db:setup` on container start.
+
+### Environment Configuration
+
+The container runs with `NODE_ENV=production`, where `src/config/load-env.js` **skips dotenv entirely**. Combined with `.dockerignore` excluding all `.env*` files, you **must** pass configuration through Docker environment variables.
+
+**Recommended**: pass variables explicitly:
+
+```bash
+docker run -d -p 3000:3000 \
+  -e PORT=3000 \
+  -e ADMIN_KEY=my-secret-key \
+  -e REDIS_HOST=redis \
+  -e SEED_API_BASE_URL=https://jsonplaceholder.typicode.com \
+  -v ./storage:/app/storage \
+  --name json-api-server json-api-server
+```
+
+**Alternative — mount an env file** (only works with `NODE_ENV=production-local`):
+
+```bash
+docker run -d -p 3000:3000 \
+  -e NODE_ENV=production-local \
+  -v ./.env.prod:/app/.env.prod \
+  -v ./storage:/app/storage \
+  --name json-api-server json-api-server
+```
+
 > **Note:** Node 22 may show a warning that `node:sqlite` is experimental. This is harmless.
 
 ---
@@ -325,6 +386,7 @@ json-api-server/
 │   ├── health.sh                # Health endpoint
 │   ├── inspect-queries.sql      # SQL queries for database inspection
 │   ├── inspect.sh               # Database inspection script
+│   ├── inspect-docker-data.sh   # Docker data inspection script
 │   ├── photos.sh                # Photos endpoints
 │   ├── posts.sh                 # Posts endpoints
 │   ├── todos.sh                 # Todos endpoints
@@ -332,6 +394,9 @@ json-api-server/
 ├── manual-test-coverage/
 │   ├── README.md                    # Coverage verification documentation
 │   └── verify-commit-coverage.sh    # Coverage verification script
+├── Dockerfile                   # Docker image definition
+├── docker-entrypoint.sh         # Container entrypoint script
+├── .dockerignore                # Docker ignore rules
 ├── storage/                     # SQLite database files (auto-created)
 ├── temp/                        # Temporary files (gitignored)
 ├── .env                         # Base configuration (tried first in development — highest priority)
