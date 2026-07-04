@@ -1,5 +1,7 @@
 # Testing
 
+> 🌐 Language / Ngôn ngữ: **English** | [Tiếng Việt](README.vi.md)
+
 ## Stack
 
 - **vitest** — test runner
@@ -35,6 +37,8 @@ tests/
     integration.test.js              # API integration tests — real HTTP + SQLite, runtime PATCH settings (81 tests)
     index.test.js                    # Server request handler, admin auth, graceful shutdown (13 tests)
     route.test.js                    # Route parsing, favicon, health, admin auth cache, runtime config updates (18 tests)
+  README.md                          # Testing documentation (English)
+  README.vi.md                       # Testing documentation (Vietnamese)
   helpers/
     coverage.js                      # Shared test utilities (save/restore/setEnv/clearCjs/configMockFactory)
     mock-factory.js                  # Mock factory helpers (mkDb/mkReq/mkRes/mkRedis/mkSettingsTable)

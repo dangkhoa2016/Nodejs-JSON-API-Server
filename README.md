@@ -371,7 +371,8 @@ json-api-server/
 │   │   ├── index.test.js            # Server request handler, admin auth, graceful shutdown (13)
 │   │   ├── integration.test.js      # API integration tests — real HTTP + SQLite, runtime PATCH (81)
 │   │   └── route.test.js            # Route parsing, favicon, health, admin auth cache, runtime config (18)
-│   ├── README.md                    # Testing documentation
+│   ├── README.md                    # Testing documentation (English)
+│   ├── README.vi.md                 # Testing documentation (Vietnamese)
 │   └── helpers/
 │       ├── coverage.js              # Test-coverage utilities (save/restore/setEnv/clearCjs/configMockFactory)
 │       ├── index.js                 # startServer / stopServer / request utilities
