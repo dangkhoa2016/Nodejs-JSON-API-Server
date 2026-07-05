@@ -1,8 +1,26 @@
-# json-api-server
+# Nodejs JSON API Server
+
+[![Nodejs 22.x](https://img.shields.io/badge/Nodejs-22.x-339933?style=flat&logo=nodedotjs&logoColor=white)](https://nodejs.org/)
+[![Nodejs 24.x](https://img.shields.io/badge/Nodejs-24.x-339933?style=flat&logo=nodedotjs&logoColor=white)](https://nodejs.org/)
+[![Nodejs 26.x](https://img.shields.io/badge/Nodejs-26.x-339933?style=flat&logo=nodedotjs&logoColor=white)](https://nodejs.org/)
+[![CI](https://github.com/dangkhoa2016/NodeJs-JSON-API-Server/actions/workflows/test.yml/badge.svg)](https://github.com/dangkhoa2016/NodeJs-JSON-API-Server/actions/workflows/test.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 > 🌐 Language / Ngôn ngữ: [English](README.md) | **Tiếng Việt**
 
 Một REST API tương thích JSONPlaceholder, được xây dựng chủ yếu bằng **Node.js built-ins** — dependency runtime duy nhất là `argon2` dùng để băm mật khẩu admin. Dùng `node:sqlite` để lưu trữ và một Redis client tự xây dựng trên giao thức RESP qua TCP sockets.
+
+## Điểm nổi bật
+
+- **Zero-framework, dependency tối thiểu** — Chỉ **1 dependency production** (`argon2`). HTTP, SQLite, networking — tất cả đều dùng built-ins của Node.js. Không Express, không ORM, không Redis driver.
+- **Redis client tự xây dựng** — Một Redis client hoàn chỉnh triển khai **giao thức RESP** qua TCP sockets. Hỗ trợ `AUTH`, `SELECT`, `EVAL` (Lua script), chuỗi kết nối URL, và tự động kết nối lại — tất cả trong ~200 dòng.
+- **100% kiểm thử** — **250 bài kiểm thử trên 14 file** đạt 100% ở statements, branches, functions và lines. Kiểm thử tích hợp chạy với HTTP server thật + SQLite; kiểm thử đơn vị dùng dependency injection và CJS cache mocking.
+- **Giới hạn tốc độ đa tầng** — Ba tầng fallback: Redis (Lua nguyên tử) → in-memory (LRU, 10k mục) → cho phép tất cả. Tích hợp circuit breaker (3 lỗi → mở 30s), trích xuất IP proxy dựa trên CIDR, và thời gian chặn tăng dần (5 ph → 20 ph → 1 giờ).
+- **Docker tối ưu cho production** — Multi-stage build, **user không phải root**, tự động thiết lập DB khi khởi động, file `.env` bị loại trừ. Dotenv bị bỏ qua trong production — mọi cấu hình đều qua biến môi trường.
+- **Cấu hình runtime** — Cập nhật cài đặt rate-limit và Redis qua admin API **mà không cần khởi động lại**. Thay đổi có hiệu lực ngay lập tức qua ghi đè trong bộ nhớ.
+- **Bảo mật Argon2** — Mật khẩu admin được băm bằng argon2, kết quả được lưu cache với TTL 5 giây và LRU 1k mục. Ngăn chặn SQL injection qua danh sách trắng cột và thoát LIKE. Giới hạn kích thước body ở 1 MB.
+- **Dev server với file watching tích hợp** — `npm run dev` dùng cờ `--watch` gốc của Node. Không cần Nodemon, chokidar, hay bất kỳ dependency thêm nào.
+- **Tài liệu song ngữ** — Đầy đủ tài liệu bằng **tiếng Anh và tiếng Việt** cho README, hướng dẫn kiểm thử và kiến trúc kỹ thuật.
 
 ## Công nghệ sử dụng
 
@@ -371,6 +389,14 @@ npm run test:coverage # Với báo cáo vùng phủ (100% trên mọi chỉ số
 ```
 
 Xem [tests/README.md](tests/README.md) để biết tài liệu đầy đủ.
+
+## Dự án tương tự
+
+Nếu bạn thích server này nhưng muốn có **giao diện dashboard** được xây dựng bằng **Tailwind CSS**, hãy xem:
+
+- **GitHub:** [JSON-API-Server-With-Dashboard-UI](https://github.com/dangkhoa2016/JSON-API-Server-With-Dashboard-UI)
+
+Dự án cung cấp cùng API tương thích JSONPlaceholder nhưng kèm giao diện web trực quan — cũng rất hay!
 
 ## Giấy phép
 
