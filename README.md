@@ -1,3 +1,12 @@
+---
+title: JSON API Server
+emoji: 🚀
+colorFrom: blue
+colorTo: indigo
+sdk: docker
+pinned: false
+---
+
 # Nodejs JSON API Server
 
 [![Nodejs 22.x](https://img.shields.io/badge/Nodejs-22.x-339933?style=flat&logo=nodedotjs&logoColor=white)](https://nodejs.org/)

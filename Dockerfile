@@ -40,9 +40,10 @@ RUN mkdir -p /app/storage \
 USER app
 
 ENV NODE_ENV=production \
-    DB_PATH=/app/storage/data.db
+    DB_PATH=/app/storage/data.db \
+    PORT=7860
 
-EXPOSE 3000
+EXPOSE 7860
 
 VOLUME ["/app/storage"]
 
